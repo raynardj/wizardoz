@@ -1,0 +1,351 @@
+{
+    "board": {
+        "name": "YD-ESP32-23",
+        "manufacturer": "VCC-GND Studio",
+        "version": "2022-V1.3",
+        "batch": "V2356",
+        "module": "ESP32-S3-N16R8"
+    },
+    "chip": {
+        "model": "ESP32-S3",
+        "flash_mb": 16,
+        "psram_mb": 8,
+        "psram_type": "Octal SPI",
+        "cores": 2,
+        "arch": "Xtensa LX7",
+        "max_freq_mhz": 240
+    },
+    "wireless": {
+        "wifi": [
+            "802.11b",
+            "802.11g",
+            "802.11n"
+        ],
+        "wifi_freq_ghz": 2.4,
+        "bluetooth": "BLE 5.0",
+        "antenna": "IPEX/U.FL",
+        "certifications": [
+            "FCC",
+            "CE",
+            "SRRC"
+        ]
+    },
+    "power": {
+        "input_v": [
+            3.3,
+            5.0
+        ],
+        "gpio_v": 3.3,
+        "usb_v": 5.0,
+        "logic_level": "3.3V"
+    },
+    "usb": {
+        "ports": 2,
+        "connector": "USB-C",
+        "com": {
+            "chip": "FTDI FT2232RQ",
+            "function": "UART bridge"
+        },
+        "otg": {
+            "native": true,
+            "function": "USB-OTG"
+        }
+    },
+    "buttons": {
+        "rst": {
+            "function": "Reset"
+        },
+        "boot": {
+            "function": "Boot mode select",
+            "gpio": 0
+        }
+    },
+    "leds": {
+        "rgb": {
+            "gpio": 48,
+            "type": "WS2812",
+            "count": 1
+        }
+    },
+    "pins": {
+        "left": [
+            {
+                "label": "3V3",
+                "type": "power",
+                "voltage": 3.3
+            },
+            {
+                "label": "3V3",
+                "type": "power",
+                "voltage": 3.3
+            },
+            {
+                "label": "RST",
+                "type": "reset",
+                "active": "low"
+            },
+            {
+                "gpio": 4,
+                "adc": "ADC1_CH3",
+                "touch": "T4",
+                "rtc": "RTC_GPIO4"
+            },
+            {
+                "gpio": 5,
+                "adc": "ADC1_CH4",
+                "touch": "T5",
+                "rtc": "RTC_GPIO5"
+            },
+            {
+                "gpio": 6,
+                "adc": "ADC1_CH5",
+                "touch": "T6",
+                "rtc": "RTC_GPIO6"
+            },
+            {
+                "gpio": 7,
+                "adc": "ADC1_CH6",
+                "touch": "T7",
+                "rtc": "RTC_GPIO7"
+            },
+            {
+                "gpio": 15,
+                "adc": "ADC2_CH4",
+                "touch": "T15",
+                "rtc": "RTC_GPIO15"
+            },
+            {
+                "gpio": 16,
+                "adc": "ADC2_CH5",
+                "touch": "T16",
+                "rtc": "RTC_GPIO16"
+            },
+            {
+                "gpio": 17,
+                "adc": "ADC2_CH6",
+                "touch": "T17",
+                "rtc": "RTC_GPIO17"
+            },
+            {
+                "gpio": 18,
+                "adc": "ADC2_CH7",
+                "touch": "T18",
+                "rtc": "RTC_GPIO18"
+            },
+            {
+                "gpio": 8,
+                "adc": "ADC1_CH7",
+                "touch": "T8",
+                "rtc": "RTC_GPIO8"
+            },
+            {
+                "gpio": 3,
+                "adc": "ADC1_CH2",
+                "touch": "T3",
+                "rtc": "RTC_GPIO3"
+            },
+            {
+                "gpio": 46,
+                "input_only": true
+            },
+            {
+                "gpio": 9,
+                "adc": "ADC1_CH8",
+                "touch": "T9",
+                "rtc": "RTC_GPIO9"
+            },
+            {
+                "gpio": 10,
+                "adc": "ADC1_CH9",
+                "touch": "T10",
+                "rtc": "RTC_GPIO10",
+                "spi": "FSPIIO4"
+            },
+            {
+                "gpio": 11,
+                "adc": "ADC2_CH0",
+                "touch": "T11",
+                "rtc": "RTC_GPIO11",
+                "spi": "FSPIIO5"
+            },
+            {
+                "gpio": 12,
+                "adc": "ADC2_CH1",
+                "touch": "T12",
+                "rtc": "RTC_GPIO12",
+                "spi": "FSPIIO6"
+            },
+            {
+                "gpio": 13,
+                "adc": "ADC2_CH2",
+                "touch": "T13",
+                "rtc": "RTC_GPIO13",
+                "spi": "FSPIIO7"
+            },
+            {
+                "gpio": 14,
+                "adc": "ADC2_CH3",
+                "touch": "T14",
+                "rtc": "RTC_GPIO14"
+            },
+            {
+                "label": "5V",
+                "type": "power",
+                "voltage": 5.0
+            },
+            {
+                "label": "GND",
+                "type": "ground"
+            }
+        ],
+        "right": [
+            {
+                "label": "GND",
+                "type": "ground"
+            },
+            {
+                "gpio": 43,
+                "label": "TX",
+                "uart": "U0TXD",
+                "default": "UART0 TX"
+            },
+            {
+                "gpio": 44,
+                "label": "RX",
+                "uart": "U0RXD",
+                "default": "UART0 RX"
+            },
+            {
+                "gpio": 1,
+                "adc": "ADC1_CH0",
+                "touch": "T1",
+                "rtc": "RTC_GPIO1"
+            },
+            {
+                "gpio": 2,
+                "adc": "ADC1_CH1",
+                "touch": "T2",
+                "rtc": "RTC_GPIO2"
+            },
+            {
+                "gpio": 42,
+                "jtag": "MTMS"
+            },
+            {
+                "gpio": 41,
+                "jtag": "MTDI"
+            },
+            {
+                "gpio": 40,
+                "jtag": "MTDO"
+            },
+            {
+                "gpio": 39,
+                "jtag": "MTCK"
+            },
+            {
+                "gpio": 38,
+                "spi": "FSPIWP",
+                "rgb_lcd": true
+            },
+            {
+                "gpio": 37,
+                "spi": "FSPIQ",
+                "rgb_lcd": true
+            },
+            {
+                "gpio": 36,
+                "spi": "FSPICLK",
+                "rgb_lcd": true
+            },
+            {
+                "gpio": 35,
+                "spi": "FSPID",
+                "rgb_lcd": true
+            },
+            {
+                "gpio": 0,
+                "adc": "ADC1_CH0",
+                "touch": "T0",
+                "rtc": "RTC_GPIO0",
+                "strapping": "boot"
+            },
+            {
+                "gpio": 45,
+                "strapping": "VDD_SPI",
+                "input_only": true
+            },
+            {
+                "gpio": 48,
+                "rgb_led": true,
+                "note": "onboard WS2812"
+            },
+            {
+                "gpio": 47
+            },
+            {
+                "gpio": 21,
+                "usb": "D-"
+            },
+            {
+                "gpio": 20,
+                "usb": "D+"
+            },
+            {
+                "gpio": 19,
+                "usb": "USB_D-"
+            },
+            {
+                "label": "GND",
+                "type": "ground"
+            }
+        ],
+        "total": 43
+    },
+    "strapping_pins": {
+        "gpio0": {
+            "function": "Boot mode",
+            "default": "SPI boot"
+        },
+        "gpio45": {
+            "function": "VDD_SPI voltage",
+            "default": "3.3V"
+        },
+        "gpio46": {
+            "function": "ROM log",
+            "default": "Print"
+        }
+    },
+    "interfaces": {
+        "spi": {
+            "count": 4,
+            "max_freq_mhz": 80
+        },
+        "i2c": {
+            "count": 2
+        },
+        "i2s": {
+            "count": 2
+        },
+        "uart": {
+            "count": 3
+        },
+        "adc": {
+            "channels": 20,
+            "resolution_bits": 12
+        },
+        "dac": {
+            "channels": 0
+        },
+        "touch": {
+            "channels": 14
+        },
+        "pwm": {
+            "channels": 8
+        },
+        "usb_otg": true,
+        "sdio": true,
+        "lcd": true,
+        "camera": true
+    }
+}

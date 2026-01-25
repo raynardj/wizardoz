@@ -1,0 +1,36 @@
+{
+    "chip": "PCM5102A",
+    "type": "I2S stereo DAC",
+    "audio": "32-bit 384kHz, 112dB SNR",
+    "power_v": {
+        "in": [
+            3.3,
+            5
+        ],
+        "logic": 3.3
+    },
+    "i2s_pins": [
+        "SCK",
+        "BCK",
+        "DIN",
+        "LRCK"
+    ],
+    "pins_header": [
+        "VIN",
+        "GND",
+        "LCK",
+        "DIN",
+        "BCK",
+        "SCK"
+    ],
+    "output": {
+        "jack": "3.5mm",
+        "vrms": 2.1
+    },
+    "config_defaults": {
+        "FMT": "I2S",
+        "XSMT": "unmuted",
+        "FLT": "normal",
+        "DEMP": "off"
+    }
+}

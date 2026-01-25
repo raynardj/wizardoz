@@ -1,0 +1,187 @@
+{
+    "board": {
+        "name": "PCM5102A DAC Module",
+        "type": "I2S stereo DAC breakout",
+        "color": "purple"
+    },
+    "chip": {
+        "model": "PCM5102A",
+        "manufacturer": "Texas Instruments",
+        "type": "stereo DAC",
+        "resolution_bits": 32,
+        "max_sample_rate_khz": 384,
+        "dynamic_range_db": 112,
+        "snr_db": 112,
+        "thd_db": -93
+    },
+    "power": {
+        "input_v": [
+            3.3,
+            5.0
+        ],
+        "digital_v": 3.3,
+        "analog_v": 3.3,
+        "current_ma": 24
+    },
+    "interface": {
+        "protocol": "I2S",
+        "formats": [
+            "I2S",
+            "Left-justified"
+        ],
+        "word_length_bits": [
+            16,
+            24,
+            32
+        ],
+        "sample_rates_khz": [
+            8,
+            16,
+            32,
+            44.1,
+            48,
+            96,
+            192,
+            384
+        ]
+    },
+    "pins_header": [
+        {
+            "label": "VIN",
+            "type": "power",
+            "voltage": [
+                3.3,
+                5.0
+            ],
+            "function": "supply input"
+        },
+        {
+            "label": "GND",
+            "type": "ground"
+        },
+        {
+            "label": "LCK",
+            "alias": "LRCK",
+            "type": "i2s",
+            "function": "word select / L-R clock"
+        },
+        {
+            "label": "DIN",
+            "type": "i2s",
+            "function": "serial data input"
+        },
+        {
+            "label": "BCK",
+            "type": "i2s",
+            "function": "bit clock"
+        },
+        {
+            "label": "SCK",
+            "type": "i2s",
+            "function": "system clock",
+            "note": "optional, can derive from BCK"
+        }
+    ],
+    "pins_config": [
+        {
+            "label": "FLT",
+            "type": "config",
+            "function": "filter select",
+            "states": {
+                "low": "normal latency",
+                "high": "low latency"
+            },
+            "default": "low"
+        },
+        {
+            "label": "DEMP",
+            "type": "config",
+            "function": "de-emphasis",
+            "states": {
+                "low": "off",
+                "high": "on (44.1kHz)"
+            },
+            "default": "low"
+        },
+        {
+            "label": "XSMT",
+            "type": "config",
+            "function": "soft mute",
+            "states": {
+                "low": "muted",
+                "high": "unmuted"
+            },
+            "default": "high"
+        },
+        {
+            "label": "FMT",
+            "type": "config",
+            "function": "audio format",
+            "states": {
+                "low": "I2S",
+                "high": "left-justified"
+            },
+            "default": "low"
+        }
+    ],
+    "pins_analog": [
+        {
+            "label": "A3V3",
+            "type": "power",
+            "voltage": 3.3,
+            "function": "analog supply output"
+        },
+        {
+            "label": "AGND",
+            "type": "ground",
+            "function": "analog ground"
+        },
+        {
+            "label": "ROUT",
+            "type": "audio",
+            "channel": "right",
+            "function": "right channel output"
+        },
+        {
+            "label": "LOUT",
+            "type": "audio",
+            "channel": "left",
+            "function": "left channel output"
+        }
+    ],
+    "solder_bridges": {
+        "H1L_H2L": {
+            "function": "SCK configuration",
+            "options": {
+                "H1L": "SCK from external",
+                "H2L": "SCK from BCK (PLL)"
+            }
+        },
+        "H3L_H4L": {
+            "function": "configuration pull",
+            "options": {
+                "H3L": "config pins pulled high",
+                "H4L": "config pins pulled low"
+            }
+        },
+        "chip_select": {
+            "options": [
+                "PCM5100",
+                "PCM5101",
+                "PCM5102"
+            ],
+            "default": "PCM5102"
+        }
+    },
+    "output": {
+        "jack": "3.5mm stereo",
+        "type": "line-level",
+        "vrms": 2.1,
+        "impedance_ohm": 100,
+        "channels": 2
+    },
+    "dimensions_mm": {
+        "length": 30,
+        "width": 22
+    }
+}
