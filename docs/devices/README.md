@@ -10,11 +10,11 @@
 
 | Top | Bottom |
 |:---:|:---:|
-| ![ESP32-S3 top](imgs/esp32-s1-up.jpeg) | ![ESP32-S3 bottom](imgs/esp32-s1-down.jpeg) |
+| ![ESP32-S3 top](imgs/esp32-s3-up.jpeg) | ![ESP32-S3 bottom](imgs/esp32-s3-down.jpeg) |
 
 Dual-core Xtensa LX7 running at 240 MHz with 16 MB flash and 8 MB PSRAM. Includes WiFi 2.4 GHz, BLE 5.0, dual USB-C ports, 43 GPIOs, and an onboard RGB LED. A versatile board for any IoT or embedded project.
 
-📄 [Brief](esp32-s1-brief.json) · [Full spec](esp32-s1.json)
+📄 [Brief](esp32-s3-brief.json) · [Full spec](esp32-s3.json)
 
 ---
 
