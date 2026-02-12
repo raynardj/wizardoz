@@ -82,6 +82,26 @@ async def list_devices():
     return {"devices": sorted(known_devices)}
 
 
+@app.get("/api/server-ip")
+async def server_ip(request: Request):
+    """Return the server's LAN IP so the ESP32 can connect to the WebSocket.
+    Uses the Host header when available (e.g. 192.168.1.100), else detects
+    from network interfaces."""
+    import socket
+
+    host = request.headers.get("host", "").split(":")[0]
+    # If accessed via localhost/127.0.0.1, try to find LAN IP
+    if host in ("localhost", "127.0.0.1", ""):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            host = s.getsockname()[0]
+            s.close()
+        except Exception:
+            host = "127.0.0.1"
+    return {"host": host}
+
+
 # ---------------------------------------------------------------------------
 # WebSocket — Audio producer (ESP32 -> Server)
 # ---------------------------------------------------------------------------

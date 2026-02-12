@@ -29,6 +29,7 @@
 #define WIZARDOZ_CHAR_COMMAND_UUID      "beb5483e-36e1-4688-b7f5-ea07361b26aa"
 #define WIZARDOZ_CHAR_STATUS_UUID       "beb5483e-36e1-4688-b7f5-ea07361b26ab"
 #define WIZARDOZ_CHAR_DEVICE_NAME_UUID  "beb5483e-36e1-4688-b7f5-ea07361b26ac"
+#define WIZARDOZ_CHAR_SERVER_HOST_UUID  "beb5483e-36e1-4688-b7f5-ea07361b26ad"
 
 // Commands written to the Command characteristic
 #define CMD_CONNECT     "CONNECT"
@@ -74,6 +75,7 @@ public:
     bool isWiFiConnected() const;
     String getLocalIP() const;
     String getDeviceName() const { return _deviceName; }
+    String getServerHost() const { return _serverHost.length() > 0 ? _serverHost : ""; }
 
 private:
     // -- Internal helpers ----------------------------------------------------
@@ -88,12 +90,15 @@ private:
     // -- BLE characteristic write handlers (invoked via friend callbacks) -----
     void _handleSSIDWrite(const String& value);
     void _handlePasswordWrite(const String& value);
+    void _handleServerHostWrite(const String& value);
     void _handleCommandWrite(const String& value);
 
     // -- Data ----------------------------------------------------------------
     String _deviceName;
     String _pendingSSID;
     String _pendingPassword;
+    String _pendingServerHost;
+    String _serverHost;
 
     bool   _wifiWasConnected = false;
     unsigned long _wifiConnectStart = 0;
@@ -109,5 +114,6 @@ private:
     friend class _WCServerCallbacks;
     friend class _WCSSIDCallback;
     friend class _WCPasswordCallback;
+    friend class _WCServerHostCallback;
     friend class _WCCommandCallback;
 };

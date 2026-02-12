@@ -12,6 +12,7 @@ const CHAR_PASSWORD_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a9';
 const CHAR_COMMAND_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26aa';
 const CHAR_STATUS_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ab';
 const CHAR_DEVICE_NAME_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ac';
+const CHAR_SERVER_HOST_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ad';
 
 const CMD_CONNECT = 'CONNECT';
 const CMD_DISCONNECT = 'DISCONNECT';
@@ -28,6 +29,7 @@ class WizardozDevice {
         this.charSSID = null;
         this.charPassword = null;
         this.charCommand = null;
+        this.charServerHost = null;
         this.charStatus = null;
         this.charDevName = null;
         this.deviceName = '(unknown)';
@@ -62,6 +64,7 @@ class WizardozDevice {
         this.charSSID = await this.service.getCharacteristic(CHAR_SSID_UUID);
         this.charPassword = await this.service.getCharacteristic(CHAR_PASSWORD_UUID);
         this.charCommand = await this.service.getCharacteristic(CHAR_COMMAND_UUID);
+        this.charServerHost = await this.service.getCharacteristic(CHAR_SERVER_HOST_UUID);
         this.charStatus = await this.service.getCharacteristic(CHAR_STATUS_UUID);
         this.charDevName = await this.service.getCharacteristic(CHAR_DEVICE_NAME_UUID);
 
@@ -87,14 +90,22 @@ class WizardozDevice {
         return this;
     }
 
-    /** Write WiFi credentials and send CONNECT command. */
-    async configureWiFi(ssid, password) {
+    /** Write WiFi credentials and send CONNECT command.
+     *  @param {string} ssid - WiFi network name
+     *  @param {string} password - WiFi password
+     *  @param {string} [serverHost] - Optional server IP for WebSocket (e.g. from /api/server-ip)
+     */
+    async configureWiFi(ssid, password, serverHost) {
         if (!this.server || !this.server.connected) {
             throw new Error('Device not connected');
         }
         const encoder = new TextEncoder();
         await this.charSSID.writeValue(encoder.encode(ssid));
         await this.charPassword.writeValue(encoder.encode(password));
+        if (serverHost) {
+            await this.charServerHost.writeValue(encoder.encode(serverHost));
+            console.log(`[BLE] Sent server host: ${serverHost}`);
+        }
         await this.charCommand.writeValue(encoder.encode(CMD_CONNECT));
         console.log(`[BLE] Sent WiFi config to ${this.deviceName}: SSID="${ssid}"`);
     }

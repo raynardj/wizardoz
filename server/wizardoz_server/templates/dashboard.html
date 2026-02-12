@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Dashboard — Wizardoz{% endblock %}
+{% block title %}Dashboard - Wizardoz{% endblock %}
 
 {% block content %}
 <!-- Browser compatibility warning -->
@@ -107,7 +107,14 @@
             if (!ssid) { inputSSID.focus(); return; }
             btnConfigure.disabled = true;
             try {
-                await device.configureWiFi(ssid, pass);
+                // Fetch server IP so ESP32 knows where to connect for WebSocket
+                let serverHost = null;
+                try {
+                    const res = await fetch('/api/server-ip');
+                    const data = await res.json();
+                    serverHost = data.host;
+                } catch (_) { /* ignore */ }
+                await device.configureWiFi(ssid, pass, serverHost);
             } catch (e) {
                 alert('Error: ' + e.message);
             }
@@ -128,7 +135,7 @@
             // Parse IP from "CONNECTED:192.168.x.x"
             if (raw.startsWith('CONNECTED:')) {
                 const ip = raw.split(':')[1];
-                statusDetail.textContent = `WiFi connected — IP: ${ip}`;
+                statusDetail.textContent = `WiFi connected - IP: ${ip}`;
             } else {
                 statusDetail.textContent = '';
             }

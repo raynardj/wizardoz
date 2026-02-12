@@ -14,6 +14,7 @@
 static const char *NVS_NAMESPACE = "wz_wifi";
 static const char *NVS_KEY_SSID = "ssid";
 static const char *NVS_KEY_PASS = "pass";
+static const char *NVS_KEY_SERVER = "server";
 
 // ---------------------------------------------------------------------------
 // Forward-declare BLE callback classes
@@ -30,7 +31,7 @@ class _WCServerCallbacks : public NimBLEServerCallbacks
 public:
     explicit _WCServerCallbacks(WizardozConnect *owner) : _owner(owner) {}
 
-    void onConnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo) override
+    void onConnect(NimBLEServer *pServer) override
     {
         Serial.println("[WC] BLE client connected");
         // Allow multiple connections
@@ -39,7 +40,7 @@ public:
             _owner->_onBLEClient(true);
     }
 
-    void onDisconnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo, int reason) override
+    void onDisconnect(NimBLEServer *pServer) override
     {
         Serial.println("[WC] BLE client disconnected");
         NimBLEDevice::startAdvertising();
@@ -55,7 +56,7 @@ class _WCSSIDCallback : public NimBLECharacteristicCallbacks
 {
 public:
     explicit _WCSSIDCallback(WizardozConnect *owner) : _owner(owner) {}
-    void onWrite(NimBLECharacteristic *pChar, NimBLEConnInfo &connInfo) override
+    void onWrite(NimBLECharacteristic *pChar) override
     {
         _owner->_handleSSIDWrite(String(pChar->getValue().c_str()));
     }
@@ -68,9 +69,22 @@ class _WCPasswordCallback : public NimBLECharacteristicCallbacks
 {
 public:
     explicit _WCPasswordCallback(WizardozConnect *owner) : _owner(owner) {}
-    void onWrite(NimBLECharacteristic *pChar, NimBLEConnInfo &connInfo) override
+    void onWrite(NimBLECharacteristic *pChar) override
     {
         _owner->_handlePasswordWrite(String(pChar->getValue().c_str()));
+    }
+
+private:
+    WizardozConnect *_owner;
+};
+
+class _WCServerHostCallback : public NimBLECharacteristicCallbacks
+{
+public:
+    explicit _WCServerHostCallback(WizardozConnect *owner) : _owner(owner) {}
+    void onWrite(NimBLECharacteristic *pChar) override
+    {
+        _owner->_handleServerHostWrite(String(pChar->getValue().c_str()));
     }
 
 private:
@@ -81,7 +95,7 @@ class _WCCommandCallback : public NimBLECharacteristicCallbacks
 {
 public:
     explicit _WCCommandCallback(WizardozConnect *owner) : _owner(owner) {}
-    void onWrite(NimBLECharacteristic *pChar, NimBLEConnInfo &connInfo) override
+    void onWrite(NimBLECharacteristic *pChar) override
     {
         _owner->_handleCommandWrite(String(pChar->getValue().c_str()));
     }
@@ -193,6 +207,12 @@ void WizardozConnect::_initBLE()
         NIMBLE_PROPERTY::WRITE);
     charCmd->setCallbacks(new _WCCommandCallback(this));
 
+    // Server host (write) - optional; if set, used instead of gateway for WebSocket
+    NimBLECharacteristic *charServer = pService->createCharacteristic(
+        WIZARDOZ_CHAR_SERVER_HOST_UUID,
+        NIMBLE_PROPERTY::WRITE);
+    charServer->setCallbacks(new _WCServerHostCallback(this));
+
     // Status (read + notify)
     g_charStatus = pService->createCharacteristic(
         WIZARDOZ_CHAR_STATUS_UUID,
@@ -207,10 +227,14 @@ void WizardozConnect::_initBLE()
 
     pService->start();
 
-    // Advertising
+    // Advertising — device name goes in the primary advertisement (31 bytes),
+    // the 128-bit service UUID goes in the scan response so macOS/Chrome can
+    // discover the device by name while still exposing the service UUID.
     NimBLEAdvertising *pAdv = NimBLEDevice::getAdvertising();
     pAdv->addServiceUUID(WIZARDOZ_SERVICE_UUID);
     pAdv->setScanResponse(true);
+    pAdv->setMinPreferred(0x06); // connection interval hint for Apple devices
+    pAdv->setMaxPreferred(0x12);
     pAdv->start();
 
     Serial.printf("[WC] BLE advertising as \"%s\"\n", _deviceName.c_str());
@@ -227,6 +251,7 @@ void WizardozConnect::_initWiFiFromNVS()
 
     String ssid = prefs.getString(NVS_KEY_SSID, "");
     String pass = prefs.getString(NVS_KEY_PASS, "");
+    _serverHost = prefs.getString(NVS_KEY_SERVER, "");
     prefs.end();
 
     if (ssid.length() > 0)
@@ -253,11 +278,17 @@ void WizardozConnect::_connectWiFi(const String &ssid, const String &password)
     _wifiConnecting = true;
     _wifiConnectStart = millis();
 
-    // Persist credentials
+    // Persist credentials and server host
     Preferences prefs;
     prefs.begin(NVS_NAMESPACE, false);
     prefs.putString(NVS_KEY_SSID, ssid);
     prefs.putString(NVS_KEY_PASS, password);
+    if (_pendingServerHost.length() > 0)
+    {
+        _serverHost = _pendingServerHost;
+        prefs.putString(NVS_KEY_SERVER, _serverHost);
+        Serial.printf("[WC] Server host: \"%s\"\n", _serverHost.c_str());
+    }
     prefs.end();
 
     Serial.printf("[WC] Attempting WiFi: \"%s\"\n", ssid.c_str());
@@ -320,6 +351,12 @@ void WizardozConnect::_handlePasswordWrite(const String &value)
 {
     _pendingPassword = value;
     Serial.println("[WC] Password received (hidden)");
+}
+
+void WizardozConnect::_handleServerHostWrite(const String &value)
+{
+    _pendingServerHost = value;
+    Serial.printf("[WC] Server host received: \"%s\"\n", value.c_str());
 }
 
 void WizardozConnect::_handleCommandWrite(const String &value)
