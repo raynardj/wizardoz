@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Wizardoz{% endblock %}
+
+{% block content %}
+<!-- Browser compatibility warning -->
+<div class="alert alert-warning" id="ble-warning" style="display:none;">
+    Web Bluetooth is not supported in this browser. Please use <strong>Chrome</strong> or <strong>Edge</strong>.
+</div>
+
+<div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+        <h2>BLE Device Setup</h2>
+        <button class="btn btn-primary" id="btn-scan" onclick="scanDevice()">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M6.5 6.5l11 11M6.5 17.5l11-11M12 2v4M12 18v4"/>
+            </svg>
+            Scan for Devices
+        </button>
+    </div>
+</div>
+
+<!-- Device list -->
+<div class="device-list" id="device-list">
+    <div class="empty-state" id="empty-state">
+        <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" style="opacity:.4">
+            <path d="M6.5 6.5l11 11M6.5 17.5l11-11M12 2v4M12 18v4"/>
+        </svg>
+        <p>No devices connected yet.<br>Click <strong>Scan for Devices</strong> to begin.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/ble-connect.js"></script>
+<script>
+    // -----------------------------------------------------------------------
+    // State
+    // -----------------------------------------------------------------------
+    const manager = new WizardozDeviceManager();
+    const deviceCards = new Map();  // WizardozDevice -> DOM element
+
+    // -----------------------------------------------------------------------
+    // Check Web Bluetooth support
+    // -----------------------------------------------------------------------
+    if (!navigator.bluetooth) {
+        document.getElementById('ble-warning').style.display = 'block';
+        document.getElementById('btn-scan').disabled = true;
+    }
+
+    // -----------------------------------------------------------------------
+    // Scan and connect
+    // -----------------------------------------------------------------------
+    async function scanDevice() {
+        try {
+            const device = await manager.addDevice();
+            addDeviceCard(device);
+        } catch (err) {
+            if (err.name === 'NotFoundError') return;  // user cancelled picker
+            console.error('[Dashboard]', err);
+            alert('BLE Error: ' + err.message);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // UI — Build a device card
+    // -----------------------------------------------------------------------
+    function addDeviceCard(device) {
+        document.getElementById('empty-state').style.display = 'none';
+
+        const card = document.createElement('div');
+        card.className = 'device-card';
+        card.innerHTML = `
+            <div class="device-header">
+                <h3>${escHtml(device.deviceName)}</h3>
+                <span class="badge badge-idle status-badge">${escHtml(device.status)}</span>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>WiFi SSID</label>
+                    <input type="text" class="input-ssid" placeholder="Network name">
+                </div>
+                <div class="form-group">
+                    <label>WiFi Password</label>
+                    <input type="password" class="input-pass" placeholder="Password">
+                </div>
+            </div>
+            <p class="text-sm text-muted status-detail mt-1"></p>
+            <div class="device-actions">
+                <button class="btn btn-primary btn-configure">Configure WiFi</button>
+                <button class="btn btn-outline btn-clear">Clear Saved</button>
+                <button class="btn btn-danger btn-disconnect">Disconnect BLE</button>
+            </div>
+        `;
+
+        // --- Bind actions ---
+        const btnConfigure = card.querySelector('.btn-configure');
+        const btnClear     = card.querySelector('.btn-clear');
+        const btnDisconnect= card.querySelector('.btn-disconnect');
+        const statusBadge  = card.querySelector('.status-badge');
+        const statusDetail = card.querySelector('.status-detail');
+        const inputSSID    = card.querySelector('.input-ssid');
+        const inputPass    = card.querySelector('.input-pass');
+
+        btnConfigure.addEventListener('click', async () => {
+            const ssid = inputSSID.value.trim();
+            const pass = inputPass.value;
+            if (!ssid) { inputSSID.focus(); return; }
+            btnConfigure.disabled = true;
+            try {
+                await device.configureWiFi(ssid, pass);
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+            btnConfigure.disabled = false;
+        });
+
+        btnClear.addEventListener('click', async () => {
+            await device.clearCredentials();
+        });
+
+        btnDisconnect.addEventListener('click', () => {
+            device.disconnect();
+        });
+
+        // --- Status updates ---
+        device.onStatusChange = (raw) => {
+            updateBadge(statusBadge, raw);
+            // Parse IP from "CONNECTED:192.168.x.x"
+            if (raw.startsWith('CONNECTED:')) {
+                const ip = raw.split(':')[1];
+                statusDetail.textContent = `WiFi connected — IP: ${ip}`;
+            } else {
+                statusDetail.textContent = '';
+            }
+        };
+
+        const prevOnDisconnect = device.onDisconnect;
+        device.onDisconnect = () => {
+            if (prevOnDisconnect) prevOnDisconnect();
+            card.remove();
+            deviceCards.delete(device);
+            if (deviceCards.size === 0) {
+                document.getElementById('empty-state').style.display = '';
+            }
+        };
+
+        // Update badge with current status
+        updateBadge(statusBadge, device.status);
+
+        document.getElementById('device-list').appendChild(card);
+        deviceCards.set(device, card);
+    }
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+    function updateBadge(el, raw) {
+        const base = raw.split(':')[0];
+        el.textContent = base;
+        el.className = 'badge';
+        switch (base) {
+            case 'IDLE':         el.classList.add('badge-idle'); break;
+            case 'CONNECTING':   el.classList.add('badge-connecting'); break;
+            case 'CONNECTED':    el.classList.add('badge-connected'); break;
+            case 'FAILED':       el.classList.add('badge-failed'); break;
+            case 'DISCONNECTED': el.classList.add('badge-disconnected'); break;
+            default:             el.classList.add('badge-idle');
+        }
+    }
+
+    function escHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+</script>
+{% endblock %}

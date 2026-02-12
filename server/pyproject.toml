@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "wizardoz-server"
+version = "0.1.0"
+description = "FastAPI backend for Wizardoz — BLE WiFi provisioning dashboard and real-time audio wave visualizer."
+authors = ["drwho"]
+readme = "README.md"
+packages = [{include = "wizardoz_server"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115"
+uvicorn = {extras = ["standard"], version = "^0.34"}
+jinja2 = "^3.1"
+websockets = "^14.0"
+
+[tool.poetry.scripts]
+serve = "wizardoz_server.main:run"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

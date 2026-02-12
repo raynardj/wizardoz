@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Wizardoz{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="page">
+        <header>
+            <h1>Wizardoz</h1>
+            <nav>
+                <a href="/dashboard" id="nav-dashboard">Dashboard</a>
+                <a href="/visualizer" id="nav-visualizer">Visualizer</a>
+            </nav>
+        </header>
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script>
+        // Highlight active nav link
+        const path = window.location.pathname;
+        document.querySelectorAll('header nav a').forEach(a => {
+            if (a.getAttribute('href') === path) a.classList.add('active');
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

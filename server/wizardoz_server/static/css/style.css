@@ -1,0 +1,168 @@
+/* ==========================================================================
+   Wizardoz — Shared Styles (dark theme)
+   ========================================================================== */
+
+:root {
+    --bg-primary:   #0f1117;
+    --bg-card:      #1a1d27;
+    --bg-input:     #252836;
+    --bg-hover:     #2a2d3a;
+    --border:       #2e3146;
+    --border-focus: #6c63ff;
+    --text-primary: #e4e6f0;
+    --text-muted:   #8b8fa3;
+    --accent:       #6c63ff;
+    --accent-hover: #5a52e0;
+    --success:      #3ecf8e;
+    --warning:      #f5a623;
+    --danger:       #ef4444;
+    --info:         #38bdf8;
+    --font-mono:    'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --font-sans:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius:       10px;
+    --radius-sm:    6px;
+    --shadow:       0 4px 24px rgba(0,0,0,.35);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 15px; }
+body {
+    font-family: var(--font-sans);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+/* ----- Layout ----- */
+.page { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-bottom: 1.5rem; border-bottom: 1px solid var(--border);
+    margin-bottom: 2rem;
+}
+header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+header nav { display: flex; gap: .75rem; }
+header nav a {
+    color: var(--text-muted); text-decoration: none;
+    padding: .4rem .85rem; border-radius: var(--radius-sm);
+    font-size: .875rem; transition: all .15s;
+}
+header nav a:hover, header nav a.active {
+    color: var(--text-primary); background: var(--bg-card);
+}
+header nav a.active { color: var(--accent); }
+
+/* ----- Cards ----- */
+.card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.5rem;
+    box-shadow: var(--shadow); margin-bottom: 1.25rem;
+}
+.card h2 { font-size: 1.1rem; margin-bottom: 1rem; }
+
+/* ----- Buttons ----- */
+.btn {
+    display: inline-flex; align-items: center; gap: .45rem;
+    padding: .55rem 1.15rem; border: none; border-radius: var(--radius-sm);
+    font-size: .875rem; font-weight: 600; cursor: pointer;
+    transition: all .15s; font-family: inherit;
+}
+.btn-primary   { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-success   { background: var(--success); color: #0f1117; }
+.btn-danger    { background: var(--danger); color: #fff; }
+.btn-outline   {
+    background: transparent; color: var(--text-muted);
+    border: 1px solid var(--border);
+}
+.btn-outline:hover { color: var(--text-primary); border-color: var(--text-muted); }
+.btn:disabled  { opacity: .45; cursor: not-allowed; }
+
+/* ----- Forms ----- */
+.form-group { margin-bottom: 1rem; }
+.form-group label {
+    display: block; font-size: .8rem; color: var(--text-muted);
+    margin-bottom: .3rem; font-weight: 500;
+}
+.form-group input, .form-group select {
+    width: 100%; padding: .55rem .75rem;
+    background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    font-size: .9rem; font-family: inherit; transition: border-color .15s;
+}
+.form-group input:focus, .form-group select:focus {
+    outline: none; border-color: var(--border-focus);
+}
+.form-row { display: flex; gap: 1rem; }
+.form-row .form-group { flex: 1; }
+
+/* ----- Status badges ----- */
+.badge {
+    display: inline-block; padding: .15rem .55rem;
+    border-radius: 20px; font-size: .75rem; font-weight: 600;
+}
+.badge-idle       { background: var(--bg-input); color: var(--text-muted); }
+.badge-connecting { background: rgba(245,166,35,.15); color: var(--warning); }
+.badge-connected  { background: rgba(62,207,142,.15); color: var(--success); }
+.badge-failed     { background: rgba(239,68,68,.15);  color: var(--danger);  }
+.badge-disconnected { background: rgba(139,143,163,.15); color: var(--text-muted); }
+
+/* ----- Device list ----- */
+.device-list { display: flex; flex-direction: column; gap: 1rem; }
+.device-card {
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.25rem; transition: border-color .15s;
+}
+.device-card:hover { border-color: var(--accent); }
+.device-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1rem;
+}
+.device-header h3 { font-size: 1rem; font-weight: 600; }
+.device-actions { display: flex; gap: .5rem; margin-top: 1rem; }
+
+/* ----- Alert banner ----- */
+.alert {
+    padding: .75rem 1rem; border-radius: var(--radius-sm);
+    font-size: .85rem; margin-bottom: 1.25rem;
+}
+.alert-warning {
+    background: rgba(245,166,35,.1); color: var(--warning);
+    border: 1px solid rgba(245,166,35,.25);
+}
+.alert-info {
+    background: rgba(56,189,248,.1); color: var(--info);
+    border: 1px solid rgba(56,189,248,.25);
+}
+
+/* ----- Canvas waveform ----- */
+.canvas-wrap {
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; margin-bottom: 1rem;
+}
+.canvas-wrap canvas { display: block; width: 100%; height: 260px; }
+
+/* ----- Level meter ----- */
+.level-meter {
+    height: 8px; background: var(--bg-input); border-radius: 4px;
+    overflow: hidden; margin-bottom: 1rem;
+}
+.level-meter-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--success), var(--warning), var(--danger));
+    transition: width 60ms;
+    border-radius: 4px;
+}
+
+/* ----- Misc ----- */
+.text-muted { color: var(--text-muted); }
+.text-sm    { font-size: .8rem; }
+.mt-1       { margin-top: .5rem; }
+.mt-2       { margin-top: 1rem; }
+.mb-1       { margin-bottom: .5rem; }
+.empty-state {
+    text-align: center; padding: 3rem 1rem; color: var(--text-muted);
+}
+.empty-state p { margin-top: .5rem; font-size: .9rem; }

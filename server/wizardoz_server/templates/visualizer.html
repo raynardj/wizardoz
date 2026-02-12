@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Visualizer — Wizardoz{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.75rem;">
+        <h2>Wave Visualizer</h2>
+        <div style="display:flex; align-items:center; gap:.75rem;">
+            <div class="form-group" style="margin-bottom:0; min-width:180px;">
+                <select id="device-select">
+                    <option value="">— Select a device —</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="btn-connect" onclick="toggleConnect()" disabled>
+                Connect
+            </button>
+            <button class="btn btn-outline" id="btn-refresh" onclick="refreshDevices()">
+                Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Waveform -->
+<div class="card">
+    <h2 class="mb-1">Waveform</h2>
+    <p class="text-sm text-muted mb-1">Time-domain oscilloscope view</p>
+    <div class="canvas-wrap">
+        <canvas id="wave-canvas"></canvas>
+    </div>
+    <p class="text-sm text-muted mb-1">Audio Level</p>
+    <div class="level-meter">
+        <div class="level-meter-fill" id="level-fill"></div>
+    </div>
+</div>
+
+<!-- Spectrum -->
+<div class="card">
+    <h2 class="mb-1">Frequency Spectrum</h2>
+    <p class="text-sm text-muted mb-1">Magnitude distribution</p>
+    <div class="canvas-wrap">
+        <canvas id="spec-canvas"></canvas>
+    </div>
+</div>
+
+<!-- Status -->
+<div class="alert alert-info" id="status-bar">
+    Select a device and click <strong>Connect</strong> to start visualising audio.
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/visualizer.js"></script>
+<script>
+    // -----------------------------------------------------------------------
+    // State
+    // -----------------------------------------------------------------------
+    const waveCanvas = document.getElementById('wave-canvas');
+    const specCanvas = document.getElementById('spec-canvas');
+    const levelFill  = document.getElementById('level-fill');
+    const deviceSel  = document.getElementById('device-select');
+    const btnConnect = document.getElementById('btn-connect');
+    const statusBar  = document.getElementById('status-bar');
+
+    const viz = new WaveVisualizer(waveCanvas, specCanvas, levelFill);
+    let connected = false;
+
+    // -----------------------------------------------------------------------
+    // Device list
+    // -----------------------------------------------------------------------
+    async function refreshDevices() {
+        try {
+            const res = await fetch('/api/devices');
+            const data = await res.json();
+            const prev = deviceSel.value;
+
+            // Clear options (keep placeholder)
+            while (deviceSel.options.length > 1) deviceSel.remove(1);
+
+            for (const id of data.devices) {
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = id;
+                deviceSel.appendChild(opt);
+            }
+
+            // Restore previous selection if still available
+            if (prev && data.devices.includes(prev)) {
+                deviceSel.value = prev;
+            }
+
+            btnConnect.disabled = !deviceSel.value;
+        } catch (err) {
+            console.error('[Viz] Failed to fetch devices', err);
+        }
+    }
+
+    deviceSel.addEventListener('change', () => {
+        btnConnect.disabled = !deviceSel.value;
+    });
+
+    // -----------------------------------------------------------------------
+    // Connect / Disconnect
+    // -----------------------------------------------------------------------
+    function toggleConnect() {
+        if (connected) {
+            viz.disconnect();
+            connected = false;
+            btnConnect.textContent = 'Connect';
+            btnConnect.classList.remove('btn-danger');
+            btnConnect.classList.add('btn-primary');
+            deviceSel.disabled = false;
+            statusBar.innerHTML = 'Disconnected. Select a device and click <strong>Connect</strong>.';
+        } else {
+            const id = deviceSel.value;
+            if (!id) return;
+            viz.connect(id);
+            connected = true;
+            btnConnect.textContent = 'Disconnect';
+            btnConnect.classList.remove('btn-primary');
+            btnConnect.classList.add('btn-danger');
+            deviceSel.disabled = true;
+            statusBar.innerHTML = `Streaming audio from <strong>${escHtml(id)}</strong>...`;
+        }
+    }
+
+    function escHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    // -----------------------------------------------------------------------
+    // Init
+    // -----------------------------------------------------------------------
+    refreshDevices();
+    // Auto-refresh device list every 5 seconds
+    setInterval(refreshDevices, 5000);
+</script>
+{% endblock %}
