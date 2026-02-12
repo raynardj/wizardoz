@@ -1,0 +1,103 @@
+{
+    "board": {
+        "name": "WLK1501SPI-8P LCD Module",
+        "type": "SPI TFT color display breakout",
+        "color": "purple",
+        "size_inches": 1.54
+    },
+    "chip": {
+        "model": "ST7789",
+        "manufacturer": "Sitronix",
+        "type": "TFT LCD controller/driver",
+        "resolution_px": [240, 240],
+        "color_depth_bits": 16,
+        "color_format": "RGB565",
+        "max_spi_clock_mhz": 80
+    },
+    "display": {
+        "type": "IPS TFT LCD",
+        "resolution_px": [240, 240],
+        "size_inches": 1.54,
+        "color_depth_bits": 16,
+        "colors": 65536,
+        "viewing_angle_deg": 170,
+        "backlight": "LED"
+    },
+    "power": {
+        "input_v": [3.3, 5.0],
+        "logic_v": 3.3,
+        "backlight_v": 3.3,
+        "current_ma": 30
+    },
+    "interface": {
+        "protocol": "SPI",
+        "modes": ["SPI mode 0", "SPI mode 3"],
+        "max_clock_mhz": 80,
+        "data_lines": 1
+    },
+    "pins_header": [
+        {
+            "pin": 1,
+            "label": "BLK",
+            "alias": "BL",
+            "type": "backlight",
+            "function": "backlight control (active high)"
+        },
+        {
+            "pin": 2,
+            "label": "CS",
+            "type": "spi",
+            "function": "chip select (active low)"
+        },
+        {
+            "pin": 3,
+            "label": "DC",
+            "alias": "RS",
+            "type": "spi",
+            "function": "data/command select (low = command, high = data)"
+        },
+        {
+            "pin": 4,
+            "label": "RES",
+            "alias": "RST",
+            "type": "control",
+            "function": "hardware reset (active low)"
+        },
+        {
+            "pin": 5,
+            "label": "SDA",
+            "alias": "MOSI",
+            "type": "spi",
+            "function": "serial data input (SPI MOSI)"
+        },
+        {
+            "pin": 6,
+            "label": "SCL",
+            "alias": "SCK",
+            "type": "spi",
+            "function": "serial clock (SPI CLK)"
+        },
+        {
+            "pin": 7,
+            "label": "VCC",
+            "type": "power",
+            "voltage": [3.3, 5.0],
+            "function": "supply input"
+        },
+        {
+            "pin": 8,
+            "label": "GND",
+            "type": "ground"
+        }
+    ],
+    "touch": {
+        "type": "capacitive",
+        "interface": "I2C",
+        "connector": "CTP_IIC",
+        "note": "FPC connector on board for optional capacitive touch panel"
+    },
+    "dimensions_mm": {
+        "length": 38,
+        "width": 35
+    }
+}

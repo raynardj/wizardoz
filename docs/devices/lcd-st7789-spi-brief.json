@@ -1,0 +1,28 @@
+{
+    "chip": "ST7789",
+    "type": "SPI TFT color LCD",
+    "display": "240x240 IPS, 65K colors, 1.54 inch",
+    "power_v": {
+        "in": [3.3, 5],
+        "logic": 3.3
+    },
+    "spi_pins": [
+        "SCL",
+        "SDA",
+        "CS",
+        "DC",
+        "RES"
+    ],
+    "pins_header": [
+        "BLK",
+        "CS",
+        "DC",
+        "RES",
+        "SDA",
+        "SCL",
+        "VCC",
+        "GND"
+    ],
+    "backlight": "LED (BLK pin)",
+    "touch": "CTP I2C (optional FPC)"
+}

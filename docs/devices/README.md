@@ -32,6 +32,18 @@ Dual-core Xtensa LX7 running at 240 MHz with 16 MB flash and 8 MB PSRAM. Include
 
 ---
 
+### LCD 1.54" ST7789 SPI
+
+| Top | Bottom |
+|:---:|:---:|
+| ![ST7789 top](imgs/lcd-st7789-spi-up.jpeg) | ![ST7789 bottom](imgs/lcd-st7789-spi-down.jpeg) |
+
+1.54" IPS TFT color LCD with an ST7789 driver and SPI interface. 240x240 pixel resolution with 65K colors, LED backlight, and an optional capacitive touch panel via FPC connector. Runs on 3.3 V or 5 V with an 8-pin header (BLK, CS, DC, RES, SDA, SCL, VCC, GND).
+
+📄 [Brief](lcd-st7789-spi-brief.json) · [Full spec](lcd-st7789-spi.json)
+
+---
+
 ## 🔊 Audio
 
 ### DAC PCM5102A

@@ -6,16 +6,16 @@
  */
 
 // BLE UUIDs — must match WizardozConnect.h
-const SERVICE_UUID        = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
-const CHAR_SSID_UUID      = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
-const CHAR_PASSWORD_UUID  = 'beb5483e-36e1-4688-b7f5-ea07361b26a9';
-const CHAR_COMMAND_UUID   = 'beb5483e-36e1-4688-b7f5-ea07361b26aa';
-const CHAR_STATUS_UUID    = 'beb5483e-36e1-4688-b7f5-ea07361b26ab';
+const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+const CHAR_SSID_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+const CHAR_PASSWORD_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a9';
+const CHAR_COMMAND_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26aa';
+const CHAR_STATUS_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ab';
 const CHAR_DEVICE_NAME_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26ac';
 
-const CMD_CONNECT    = 'CONNECT';
+const CMD_CONNECT = 'CONNECT';
 const CMD_DISCONNECT = 'DISCONNECT';
-const CMD_CLEAR      = 'CLEAR';
+const CMD_CLEAR = 'CLEAR';
 
 /**
  * Represents a single BLE connection to a Wizardoz ESP32 device.
@@ -42,8 +42,10 @@ class WizardozDevice {
             throw new Error('Web Bluetooth is not supported in this browser.');
         }
 
+        // Filter by name prefix — more reliable on macOS/Chrome than filtering
+        // by 128-bit service UUID, which may not fit in the 31-byte advertisement.
         this.bleDevice = await navigator.bluetooth.requestDevice({
-            filters: [{ services: [SERVICE_UUID] }],
+            filters: [{ namePrefix: 'Wizardoz' }],
             optionalServices: [SERVICE_UUID],
         });
 
@@ -57,11 +59,11 @@ class WizardozDevice {
         this.service = await this.server.getPrimaryService(SERVICE_UUID);
 
         // Grab all characteristics
-        this.charSSID     = await this.service.getCharacteristic(CHAR_SSID_UUID);
+        this.charSSID = await this.service.getCharacteristic(CHAR_SSID_UUID);
         this.charPassword = await this.service.getCharacteristic(CHAR_PASSWORD_UUID);
-        this.charCommand  = await this.service.getCharacteristic(CHAR_COMMAND_UUID);
-        this.charStatus   = await this.service.getCharacteristic(CHAR_STATUS_UUID);
-        this.charDevName  = await this.service.getCharacteristic(CHAR_DEVICE_NAME_UUID);
+        this.charCommand = await this.service.getCharacteristic(CHAR_COMMAND_UUID);
+        this.charStatus = await this.service.getCharacteristic(CHAR_STATUS_UUID);
+        this.charDevName = await this.service.getCharacteristic(CHAR_DEVICE_NAME_UUID);
 
         // Read device name
         const nameValue = await this.charDevName.readValue();
