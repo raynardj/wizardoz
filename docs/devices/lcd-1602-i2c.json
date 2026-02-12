@@ -1,0 +1,195 @@
+{
+    "board": {
+        "name": "1602 LCD with I2C Backpack",
+        "type": "16x2 character LCD module with I2C adapter",
+        "color": "blue backlight, green PCB"
+    },
+    "lcd": {
+        "model": "1602A",
+        "manufacturer": "QAPASS",
+        "type": "character LCD",
+        "controller": "HD44780 compatible",
+        "columns": 16,
+        "rows": 2,
+        "backlight": "blue LED",
+        "text_color": "white",
+        "character_size_mm": {
+            "width": 2.96,
+            "height": 4.75
+        },
+        "dot_matrix": "5x8"
+    },
+    "i2c_adapter": {
+        "model": "HW-61",
+        "chip": "PCF8574T",
+        "manufacturer": "NXP",
+        "type": "I2C to 8-bit parallel I/O expander",
+        "default_address_hex": "0x27",
+        "address_range_hex": ["0x20", "0x27"],
+        "contrast_adjust": "potentiometer (blue trimmer)"
+    },
+    "power": {
+        "input_v": 5.0,
+        "logic_v": 5.0,
+        "backlight_current_ma": 30,
+        "total_current_ma": 80
+    },
+    "interface": {
+        "protocol": "I2C",
+        "speed_khz": 100,
+        "data_bits": 4,
+        "note": "4-bit mode via PCF8574T expander"
+    },
+    "pins_header": [
+        {
+            "label": "GND",
+            "type": "ground"
+        },
+        {
+            "label": "VCC",
+            "type": "power",
+            "voltage": 5.0,
+            "function": "supply input"
+        },
+        {
+            "label": "SDA",
+            "type": "i2c",
+            "function": "I2C data"
+        },
+        {
+            "label": "SCL",
+            "type": "i2c",
+            "function": "I2C clock"
+        }
+    ],
+    "pins_lcd_header": [
+        {
+            "label": "VSS",
+            "type": "ground"
+        },
+        {
+            "label": "VDD",
+            "type": "power",
+            "voltage": 5.0
+        },
+        {
+            "label": "V0",
+            "type": "analog",
+            "function": "contrast adjust"
+        },
+        {
+            "label": "RS",
+            "type": "control",
+            "function": "register select"
+        },
+        {
+            "label": "RW",
+            "type": "control",
+            "function": "read/write select"
+        },
+        {
+            "label": "E",
+            "type": "control",
+            "function": "enable"
+        },
+        {
+            "label": "D0",
+            "type": "data",
+            "function": "data bit 0 (unused in 4-bit mode)"
+        },
+        {
+            "label": "D1",
+            "type": "data",
+            "function": "data bit 1 (unused in 4-bit mode)"
+        },
+        {
+            "label": "D2",
+            "type": "data",
+            "function": "data bit 2 (unused in 4-bit mode)"
+        },
+        {
+            "label": "D3",
+            "type": "data",
+            "function": "data bit 3 (unused in 4-bit mode)"
+        },
+        {
+            "label": "D4",
+            "type": "data",
+            "function": "data bit 4"
+        },
+        {
+            "label": "D5",
+            "type": "data",
+            "function": "data bit 5"
+        },
+        {
+            "label": "D6",
+            "type": "data",
+            "function": "data bit 6"
+        },
+        {
+            "label": "D7",
+            "type": "data",
+            "function": "data bit 7"
+        },
+        {
+            "label": "A",
+            "type": "power",
+            "function": "backlight anode"
+        },
+        {
+            "label": "K",
+            "type": "ground",
+            "function": "backlight cathode"
+        }
+    ],
+    "address_jumpers": [
+        {
+            "label": "A0",
+            "type": "config",
+            "function": "I2C address bit 0",
+            "states": {
+                "open": "1",
+                "bridged": "0"
+            },
+            "default": "open"
+        },
+        {
+            "label": "A1",
+            "type": "config",
+            "function": "I2C address bit 1",
+            "states": {
+                "open": "1",
+                "bridged": "0"
+            },
+            "default": "open"
+        },
+        {
+            "label": "A2",
+            "type": "config",
+            "function": "I2C address bit 2",
+            "states": {
+                "open": "1",
+                "bridged": "0"
+            },
+            "default": "open"
+        }
+    ],
+    "pcf8574t_pin_mapping": {
+        "P0": "RS",
+        "P1": "RW",
+        "P2": "E",
+        "P3": "Backlight",
+        "P4": "D4",
+        "P5": "D5",
+        "P6": "D6",
+        "P7": "D7"
+    },
+    "dimensions_mm": {
+        "lcd_length": 80,
+        "lcd_width": 36,
+        "lcd_height": 12,
+        "viewing_area_length": 64.5,
+        "viewing_area_width": 16
+    }
+}

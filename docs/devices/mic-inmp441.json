@@ -1,0 +1,74 @@
+{
+    "board": {
+        "name": "INMP441 Microphone Module",
+        "type": "I2S MEMS digital microphone breakout",
+        "color": "black",
+        "shape": "round"
+    },
+    "chip": {
+        "model": "INMP441",
+        "manufacturer": "InvenSense (TDK)",
+        "type": "MEMS digital microphone",
+        "interface": "I2S",
+        "snr_db": 61,
+        "sensitivity_dbfs": -26,
+        "frequency_range_hz": [60, 15000],
+        "aop_db": 116,
+        "resolution_bits": 24
+    },
+    "power": {
+        "input_v": [1.8, 3.3],
+        "typical_v": 3.3,
+        "current_ua": 1400,
+        "sleep_current_ua": 20
+    },
+    "interface": {
+        "protocol": "I2S",
+        "word_length_bits": [24],
+        "sample_rates_khz": [8, 16, 32, 44.1, 48],
+        "clock_freq_mhz": [1.024, 2.048, 3.072, 4.096]
+    },
+    "pins_header": [
+        {
+            "label": "VDD",
+            "type": "power",
+            "voltage": [1.8, 3.3],
+            "function": "supply input"
+        },
+        {
+            "label": "GND",
+            "type": "ground"
+        },
+        {
+            "label": "SD",
+            "type": "i2s",
+            "function": "serial data output"
+        },
+        {
+            "label": "WS",
+            "alias": "LRCK",
+            "type": "i2s",
+            "function": "word select / L-R clock"
+        },
+        {
+            "label": "SCK",
+            "alias": "BCLK",
+            "type": "i2s",
+            "function": "bit clock input"
+        },
+        {
+            "label": "L/R",
+            "type": "config",
+            "function": "channel select",
+            "states": {
+                "low": "left channel (default)",
+                "high": "right channel"
+            },
+            "default": "low"
+        }
+    ],
+    "dimensions_mm": {
+        "diameter": 16,
+        "height": 3.5
+    }
+}

@@ -1,0 +1,26 @@
+{
+    "chip": "INMP441",
+    "type": "I2S MEMS digital microphone",
+    "audio": "24-bit, 61dB SNR, 60Hz–15kHz",
+    "power_v": {
+        "in": [1.8, 3.3],
+        "typical": 3.3
+    },
+    "i2s_pins": [
+        "SCK",
+        "WS",
+        "SD"
+    ],
+    "pins_header": [
+        "VDD",
+        "GND",
+        "SD",
+        "WS",
+        "SCK",
+        "L/R"
+    ],
+    "channel_select": {
+        "L/R low": "left",
+        "L/R high": "right"
+    }
+}

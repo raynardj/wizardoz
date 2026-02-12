@@ -1,0 +1,22 @@
+{
+    "chip": "PCF8574T",
+    "type": "16x2 character LCD with I2C backpack",
+    "display": "16x2 HD44780, blue backlight, white text",
+    "power_v": {
+        "in": 5,
+        "logic": 5
+    },
+    "i2c_address": "0x27",
+    "i2c_pins": [
+        "SDA",
+        "SCL"
+    ],
+    "pins_header": [
+        "GND",
+        "VCC",
+        "SDA",
+        "SCL"
+    ],
+    "address_jumpers": ["A0", "A1", "A2"],
+    "contrast": "potentiometer"
+}
