@@ -1,0 +1,79 @@
+{
+    "board": {
+        "name": "HC-SR501 PIR Motion Sensor Module",
+        "type": "passive infrared motion detector breakout",
+        "color": "green"
+    },
+    "chip": {
+        "model": "BISS0001",
+        "manufacturer": "BIS Technologies",
+        "type": "micro power PIR motion detector IC",
+        "package": "SOP-16"
+    },
+    "sensor": {
+        "type": "pyroelectric infrared (PIR)",
+        "element": "dual-element",
+        "lens": "Fresnel lens dome",
+        "detection_range_m": [3, 7],
+        "detection_angle_deg": 120,
+        "delay_time_s": [0.3, 300],
+        "block_time_s": 2.5
+    },
+    "power": {
+        "input_v": [4.5, 20],
+        "typical_v": 5,
+        "quiescent_current_ua": 65
+    },
+    "output": {
+        "type": "digital",
+        "high_v": 3.3,
+        "low_v": 0,
+        "high_meaning": "motion detected",
+        "low_meaning": "no motion"
+    },
+    "pins_header": [
+        {
+            "label": "VCC",
+            "type": "power",
+            "voltage": [4.5, 20],
+            "function": "supply input"
+        },
+        {
+            "label": "OUT",
+            "type": "digital_output",
+            "voltage": 3.3,
+            "function": "motion detection output (HIGH = motion)"
+        },
+        {
+            "label": "GND",
+            "type": "ground"
+        }
+    ],
+    "adjustments": [
+        {
+            "label": "Sensitivity",
+            "type": "potentiometer",
+            "function": "detection range",
+            "range": "~3 m (CW) to ~7 m (CCW)"
+        },
+        {
+            "label": "Time Delay",
+            "type": "potentiometer",
+            "function": "output hold time after trigger",
+            "range": "~0.3 s (CW) to ~5 min (CCW)"
+        }
+    ],
+    "trigger_mode_jumper": {
+        "function": "trigger mode select",
+        "options": {
+            "H": "repeatable trigger (re-triggers while motion continues)",
+            "L": "single trigger (one pulse per detection)"
+        },
+        "default": "H"
+    },
+    "dimensions_mm": {
+        "length": 32,
+        "width": 24,
+        "lens_diameter": 23
+    }
+}

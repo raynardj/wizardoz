@@ -1,0 +1,105 @@
+{
+    "board": {
+        "name": "4x4 Matrix Membrane Keypad",
+        "type": "matrix keypad input module",
+        "color": "black with blue/red keys"
+    },
+    "construction": {
+        "type": "membrane switch",
+        "technology": "conductive ink on flexible substrate",
+        "layers": 4,
+        "lifecycle_presses": 1000000,
+        "operating_force_g": 170
+    },
+    "matrix": {
+        "rows": 4,
+        "columns": 4,
+        "total_keys": 16,
+        "layout": [
+            ["1", "2", "3", "A"],
+            ["4", "5", "6", "B"],
+            ["7", "8", "9", "C"],
+            ["*", "0", "#", "D"]
+        ]
+    },
+    "electrical": {
+        "max_voltage_v": 24,
+        "max_current_ma": 30,
+        "contact_bounce_ms": 5,
+        "contact_resistance_ohm": [100, 500],
+        "insulation_resistance_mohm": 100,
+        "dielectric_strength_v": 250
+    },
+    "interface": {
+        "protocol": "passive matrix scan",
+        "scanning_method": "row-column polling or interrupt-driven",
+        "pins_total": 8,
+        "rows_active": "low or high depending on scan direction",
+        "requires_pullup": true,
+        "note": "no power supply needed; purely passive switches"
+    },
+    "pins_header": [
+        {
+            "pin": 1,
+            "label": "R1",
+            "type": "row",
+            "function": "row 1 (keys 1, 2, 3, A)"
+        },
+        {
+            "pin": 2,
+            "label": "R2",
+            "type": "row",
+            "function": "row 2 (keys 4, 5, 6, B)"
+        },
+        {
+            "pin": 3,
+            "label": "R3",
+            "type": "row",
+            "function": "row 3 (keys 7, 8, 9, C)"
+        },
+        {
+            "pin": 4,
+            "label": "R4",
+            "type": "row",
+            "function": "row 4 (keys *, 0, #, D)"
+        },
+        {
+            "pin": 5,
+            "label": "C1",
+            "type": "column",
+            "function": "column 1 (keys 1, 4, 7, *)"
+        },
+        {
+            "pin": 6,
+            "label": "C2",
+            "type": "column",
+            "function": "column 2 (keys 2, 5, 8, 0)"
+        },
+        {
+            "pin": 7,
+            "label": "C3",
+            "type": "column",
+            "function": "column 3 (keys 3, 6, 9, #)"
+        },
+        {
+            "pin": 8,
+            "label": "C4",
+            "type": "column",
+            "function": "column 4 (keys A, B, C, D)"
+        }
+    ],
+    "connector": {
+        "type": "8-pin single-row female header (2.54mm pitch)",
+        "pin_order": "R1 R2 R3 R4 C1 C2 C3 C4 (left to right, face up)"
+    },
+    "environment": {
+        "operating_temp_c": [-20, 50],
+        "storage_temp_c": [-40, 80],
+        "humidity_pct": [5, 95]
+    },
+    "dimensions_mm": {
+        "length": 77,
+        "width": 69,
+        "thickness": 1
+    }
+}

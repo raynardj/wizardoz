@@ -1,0 +1,27 @@
+{
+    "chip": "BISS0001",
+    "type": "PIR motion sensor",
+    "detection": "3–7 m range, 120° angle",
+    "power_v": {
+        "in": [4.5, 20],
+        "typical": 5
+    },
+    "output": {
+        "type": "digital",
+        "high_v": 3.3,
+        "meaning": "HIGH = motion detected"
+    },
+    "pins_header": [
+        "VCC",
+        "OUT",
+        "GND"
+    ],
+    "adjustments": {
+        "sensitivity": "3–7 m (potentiometer)",
+        "delay": "0.3 s – 5 min (potentiometer)"
+    },
+    "trigger_mode": {
+        "H": "repeatable",
+        "L": "single"
+    }
+}
