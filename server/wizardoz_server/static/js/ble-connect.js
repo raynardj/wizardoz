@@ -18,6 +18,32 @@ const CMD_CONNECT = 'CONNECT';
 const CMD_DISCONNECT = 'DISCONNECT';
 const CMD_CLEAR = 'CLEAR';
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Dump a DataView as a hex string (e.g. "43 4f 4e 4e 45 43 54") for debug. */
+function _bleHex(dataView) {
+    const bytes = new Uint8Array(dataView.buffer, dataView.byteOffset, dataView.byteLength);
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+}
+
+/** Decode a DataView to a clean UTF-8 string, stripping nulls / control
+ *  chars / U+FFFD replacement characters that BLE reads sometimes produce
+ *  (macOS GATT cache, MTU clipping, uninitialised buffers, …). */
+function _bleDecode(dataView) {
+    const raw = new TextDecoder().decode(dataView);
+    return raw.replace(/[\x00-\x1f\uFFFD]/g, '').trim();
+}
+
+/** Acknowledged BLE write (Write Request).  Falls back to the deprecated
+ *  writeValue() for browsers that lack writeValueWithResponse. */
+function _bleWrite(char, data) {
+    return char.writeValueWithResponse
+        ? char.writeValueWithResponse(data)
+        : char.writeValue(data);
+}
+
 /**
  * Represents a single BLE connection to a Wizardoz ESP32 device.
  */
@@ -54,6 +80,7 @@ class WizardozDevice {
         this.bleDevice.addEventListener('gattserverdisconnected', () => {
             console.log(`[BLE] Device disconnected: ${this.deviceName}`);
             this.status = 'DISCONNECTED';
+            if (this.onStatusChange) this.onStatusChange('DISCONNECTED');
             if (this.onDisconnect) this.onDisconnect();
         });
 
@@ -68,23 +95,41 @@ class WizardozDevice {
         this.charStatus = await this.service.getCharacteristic(CHAR_STATUS_UUID);
         this.charDevName = await this.service.getCharacteristic(CHAR_DEVICE_NAME_UUID);
 
-        // Read device name
-        const nameValue = await this.charDevName.readValue();
-        this.deviceName = new TextDecoder().decode(nameValue);
+        // Device name — prefer the advertisement name (decoded natively by
+        // the browser & never garbled by GATT caching) over a characteristic
+        // read which macOS may return stale / uninitialised bytes for.
+        if (this.bleDevice.name) {
+            this.deviceName = this.bleDevice.name;
+        } else {
+            const nameValue = await this.charDevName.readValue();
+            this.deviceName = _bleDecode(nameValue) || '(unknown)';
+        }
 
-        // Subscribe to status notifications
+        // Subscribe to status notifications (or indications — startNotifications
+        // handles both).
         await this.charStatus.startNotifications();
         this.charStatus.addEventListener('characteristicvaluechanged', (event) => {
-            const raw = new TextDecoder().decode(event.target.value);
-            this.status = raw;
-            console.log(`[BLE] Status (${this.deviceName}): ${raw}`);
-            if (this.onStatusChange) this.onStatusChange(raw);
+            const hex = _bleHex(event.target.value);
+            const clean = _bleDecode(event.target.value);
+            console.log(`[BLE] Status raw [${hex}]  decoded "${clean}"`);
+            if (!clean) return;  // skip empty / fully-garbled frames
+            this.status = clean;
+            if (this.onStatusChange) this.onStatusChange(clean, hex);
         });
 
-        // Read initial status
-        const initStatus = await this.charStatus.readValue();
-        this.status = new TextDecoder().decode(initStatus);
-        if (this.onStatusChange) this.onStatusChange(this.status);
+        // Read initial status — sanitise because macOS may return cached junk.
+        // Fall back to "IDLE" when the read is unreadable.
+        try {
+            const initStatus = await this.charStatus.readValue();
+            const hex = _bleHex(initStatus);
+            const decoded = _bleDecode(initStatus);
+            console.log(`[BLE] Initial status raw [${hex}]  decoded "${decoded}"`);
+            this.status = decoded || 'IDLE';
+        } catch (e) {
+            console.warn('[BLE] Could not read initial status, defaulting to IDLE', e);
+            this.status = 'IDLE';
+        }
+        if (this.onStatusChange) this.onStatusChange(this.status, null);
 
         console.log(`[BLE] Connected to: ${this.deviceName}`);
         return this;
@@ -93,35 +138,46 @@ class WizardozDevice {
     /** Write WiFi credentials and send CONNECT command.
      *  @param {string} ssid - WiFi network name
      *  @param {string} password - WiFi password
-     *  @param {string} [serverHost] - Optional server IP for WebSocket (e.g. from /api/server-ip)
+     *  @param {string} [serverHost] - Optional server IP for WebSocket
+     *  @param {function} [onProgress] - Optional callback(message) for step-by-step feedback
      */
-    async configureWiFi(ssid, password, serverHost) {
+    async configureWiFi(ssid, password, serverHost, onProgress) {
+        const log = onProgress || (() => {});
+
         if (!this.server || !this.server.connected) {
-            throw new Error('Device not connected');
+            throw new Error('BLE device not connected — please re-scan.');
         }
         const encoder = new TextEncoder();
-        await this.charSSID.writeValue(encoder.encode(ssid));
-        await this.charPassword.writeValue(encoder.encode(password));
+
+        log(`Writing SSID "${ssid}" (${ssid.length} chars)…`);
+        await _bleWrite(this.charSSID, encoder.encode(ssid));
+        log('SSID written OK');
+
+        log('Writing password…');
+        await _bleWrite(this.charPassword, encoder.encode(password));
+        log('Password written OK');
+
         if (serverHost) {
-            await this.charServerHost.writeValue(encoder.encode(serverHost));
-            console.log(`[BLE] Sent server host: ${serverHost}`);
+            log(`Writing server host: ${serverHost}…`);
+            await _bleWrite(this.charServerHost, encoder.encode(serverHost));
+            log('Server host written OK');
         }
-        await this.charCommand.writeValue(encoder.encode(CMD_CONNECT));
-        console.log(`[BLE] Sent WiFi config to ${this.deviceName}: SSID="${ssid}"`);
+
+        log('Sending CONNECT command…');
+        await _bleWrite(this.charCommand, encoder.encode(CMD_CONNECT));
+        log('CONNECT sent — waiting for device to join WiFi…');
     }
 
     /** Send DISCONNECT command. */
     async disconnectWiFi() {
         if (!this.server || !this.server.connected) return;
-        const encoder = new TextEncoder();
-        await this.charCommand.writeValue(encoder.encode(CMD_DISCONNECT));
+        await _bleWrite(this.charCommand, new TextEncoder().encode(CMD_DISCONNECT));
     }
 
     /** Send CLEAR command to wipe stored credentials. */
     async clearCredentials() {
         if (!this.server || !this.server.connected) return;
-        const encoder = new TextEncoder();
-        await this.charCommand.writeValue(encoder.encode(CMD_CLEAR));
+        await _bleWrite(this.charCommand, new TextEncoder().encode(CMD_CLEAR));
     }
 
     /** Disconnect BLE GATT. */

@@ -77,35 +77,71 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>WiFi SSID</label>
-                    <input type="text" class="input-ssid" placeholder="Network name">
+                    <input type="text" class="input-ssid" placeholder="Network name"
+                           autocomplete="off" data-1p-ignore data-lpignore="true">
                 </div>
                 <div class="form-group">
                     <label>WiFi Password</label>
-                    <input type="password" class="input-pass" placeholder="Password">
+                    <input type="text" class="input-pass" placeholder="Password"
+                           autocomplete="off" data-1p-ignore data-lpignore="true"
+                           style="-webkit-text-security: disc;">
                 </div>
             </div>
-            <p class="text-sm text-muted status-detail mt-1"></p>
+            <p class="status-detail mt-1"></p>
             <div class="device-actions">
                 <button class="btn btn-primary btn-configure">Configure WiFi</button>
                 <button class="btn btn-outline btn-clear">Clear Saved</button>
                 <button class="btn btn-danger btn-disconnect">Disconnect BLE</button>
             </div>
+            <div class="device-log"></div>
         `;
 
-        // --- Bind actions ---
-        const btnConfigure = card.querySelector('.btn-configure');
-        const btnClear     = card.querySelector('.btn-clear');
-        const btnDisconnect= card.querySelector('.btn-disconnect');
-        const statusBadge  = card.querySelector('.status-badge');
-        const statusDetail = card.querySelector('.status-detail');
-        const inputSSID    = card.querySelector('.input-ssid');
-        const inputPass    = card.querySelector('.input-pass');
+        // --- Cached DOM refs ---
+        const btnConfigure  = card.querySelector('.btn-configure');
+        const btnClear      = card.querySelector('.btn-clear');
+        const btnDisconnect = card.querySelector('.btn-disconnect');
+        const statusBadge   = card.querySelector('.status-badge');
+        const statusDetail  = card.querySelector('.status-detail');
+        const inputSSID     = card.querySelector('.input-ssid');
+        const inputPass     = card.querySelector('.input-pass');
+        const logEl         = card.querySelector('.device-log');
 
+        // --- Log helper ---
+        function dlog(msg, level) {
+            const ts = new Date().toLocaleTimeString();
+            const p = document.createElement('p');
+            p.textContent = `${ts}  ${msg}`;
+            if (level === 'error')   p.style.color = 'var(--danger)';
+            if (level === 'success') p.style.color = 'var(--success)';
+            logEl.appendChild(p);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        dlog(`BLE connected to "${device.deviceName}"`);
+        dlog(`Initial status: ${device.status}`);
+
+        // --- Configure WiFi ---
         btnConfigure.addEventListener('click', async () => {
             const ssid = inputSSID.value.trim();
             const pass = inputPass.value;
-            if (!ssid) { inputSSID.focus(); return; }
+            if (!ssid) {
+                dlog('SSID is empty — please enter a network name', 'error');
+                inputSSID.focus();
+                return;
+            }
+            // Log byte details so we can catch encoding surprises
+            const ssidBytes = new TextEncoder().encode(ssid);
+            const passBytes = new TextEncoder().encode(pass);
+            dlog(`SSID: "${ssid}" — ${ssid.length} chars, ${ssidBytes.length} bytes`);
+            dlog(`Password: ${pass.length} chars, ${passBytes.length} bytes`);
+            if (ssidBytes.length !== ssid.length) {
+                dlog('Note: SSID contains multi-byte (non-ASCII) characters');
+            }
+            if (!pass) {
+                dlog('Warning: password is empty — connecting to open network');
+            }
             btnConfigure.disabled = true;
+            statusDetail.textContent = '';
             try {
                 // Fetch server IP so ESP32 knows where to connect for WebSocket
                 let serverHost = null;
@@ -113,29 +149,76 @@
                     const res = await fetch('/api/server-ip');
                     const data = await res.json();
                     serverHost = data.host;
-                } catch (_) { /* ignore */ }
-                await device.configureWiFi(ssid, pass, serverHost);
+                    dlog(`Server IP for WebSocket: ${serverHost}`);
+                } catch (_) {
+                    dlog('Could not fetch server IP (device will use gateway)');
+                }
+                await device.configureWiFi(ssid, pass, serverHost, (msg) => dlog(msg));
             } catch (e) {
-                alert('Error: ' + e.message);
+                dlog(`BLE write error: ${e.message}`, 'error');
+                statusDetail.textContent = `Error: ${e.message}`;
+                statusDetail.style.color = 'var(--danger)';
             }
             btnConfigure.disabled = false;
         });
 
+        // --- Clear saved ---
         btnClear.addEventListener('click', async () => {
-            await device.clearCredentials();
+            dlog('Sending CLEAR command…');
+            try {
+                await device.clearCredentials();
+                dlog('Credentials cleared', 'success');
+            } catch (e) {
+                dlog(`Clear failed: ${e.message}`, 'error');
+            }
         });
 
+        // --- Disconnect BLE ---
         btnDisconnect.addEventListener('click', () => {
             device.disconnect();
         });
 
-        // --- Status updates ---
-        device.onStatusChange = (raw) => {
-            updateBadge(statusBadge, raw);
-            // Parse IP from "CONNECTED:192.168.x.x"
-            if (raw.startsWith('CONNECTED:')) {
-                const ip = raw.split(':')[1];
-                statusDetail.textContent = `WiFi connected - IP: ${ip}`;
+        // --- Status updates from BLE notifications ---
+        device.onStatusChange = (raw, hex) => {
+            // Log raw + hex for diagnostics
+            if (hex) {
+                dlog(`Status: "${raw}"  [hex: ${hex}]`);
+            } else {
+                dlog(`Status: "${raw}"`);
+            }
+
+            // Known status keywords to match — also detect them inside
+            // garbled text (e.g. "N<" might be a corrupted "CONNECTING").
+            const KNOWN = ['CONNECTED', 'CONNECTING', 'FAILED', 'DISCONNECTED', 'IDLE'];
+            let base = raw.split(':')[0];
+            if (!KNOWN.includes(base)) {
+                // Try to infer from hex byte count or partial text
+                if (hex) {
+                    const nBytes = hex.split(' ').length;
+                    if (nBytes >= 9 && nBytes <= 12)      base = 'CONNECTING';  // "CONNECTING" = 10 bytes
+                    else if (nBytes >= 5 && nBytes <= 7)   base = 'FAILED';     // "FAILED" = 6 bytes
+                    else if (nBytes >= 3 && nBytes <= 5)   base = 'IDLE';       // "IDLE" = 4 bytes
+                    dlog(`(inferred "${base}" from ${nBytes}-byte payload)`, 'error');
+                }
+            }
+
+            updateBadge(statusBadge, base);
+
+            if (base === 'CONNECTED') {
+                const ip = raw.includes(':') ? raw.split(':').slice(1).join(':') : '?';
+                statusDetail.textContent = `WiFi connected — IP: ${ip}`;
+                statusDetail.style.color = 'var(--success)';
+                dlog(`WiFi connected — device IP: ${ip}`, 'success');
+            } else if (base === 'FAILED') {
+                statusDetail.textContent = 'WiFi connection failed — check SSID & password';
+                statusDetail.style.color = 'var(--danger)';
+                dlog('WiFi FAILED — wrong SSID/password or network unreachable', 'error');
+            } else if (base === 'CONNECTING') {
+                statusDetail.textContent = 'Connecting to WiFi…';
+                statusDetail.style.color = 'var(--warning)';
+            } else if (base === 'DISCONNECTED') {
+                statusDetail.textContent = 'WiFi disconnected';
+                statusDetail.style.color = 'var(--text-muted)';
             } else {
                 statusDetail.textContent = '';
             }

@@ -22,6 +22,26 @@ static const char *NVS_KEY_SERVER = "server";
 static NimBLECharacteristic *g_charStatus = nullptr;
 static NimBLECharacteristic *g_charDevName = nullptr;
 
+// ---------------------------------------------------------------------------
+// Debug helper — print raw bytes as hex
+// ---------------------------------------------------------------------------
+static void _printHex(const char *label, const uint8_t *data, size_t len)
+{
+    Serial.printf("%s (%d bytes): ", label, (int)len);
+    for (size_t i = 0; i < len; i++)
+        Serial.printf("%02x ", data[i]);
+    Serial.println();
+}
+
+/// Extract the raw value from a characteristic write as an Arduino String.
+/// Stores the std::string in a local so the c_str() pointer stays valid
+/// through the Arduino String copy.
+static String _charToString(NimBLECharacteristic *pChar)
+{
+    std::string v = pChar->getValue();
+    return String(v.c_str());
+}
+
 // ============================================================================
 // BLE Callback Classes
 // ============================================================================
@@ -58,7 +78,9 @@ public:
     explicit _WCSSIDCallback(WizardozConnect *owner) : _owner(owner) {}
     void onWrite(NimBLECharacteristic *pChar) override
     {
-        _owner->_handleSSIDWrite(String(pChar->getValue().c_str()));
+        std::string v = pChar->getValue();
+        _printHex("[WC] SSID raw", (const uint8_t *)v.data(), v.length());
+        _owner->_handleSSIDWrite(_charToString(pChar));
     }
 
 private:
@@ -71,7 +93,9 @@ public:
     explicit _WCPasswordCallback(WizardozConnect *owner) : _owner(owner) {}
     void onWrite(NimBLECharacteristic *pChar) override
     {
-        _owner->_handlePasswordWrite(String(pChar->getValue().c_str()));
+        std::string v = pChar->getValue();
+        Serial.printf("[WC] Password raw (%d bytes)\n", (int)v.length());
+        _owner->_handlePasswordWrite(_charToString(pChar));
     }
 
 private:
@@ -84,7 +108,9 @@ public:
     explicit _WCServerHostCallback(WizardozConnect *owner) : _owner(owner) {}
     void onWrite(NimBLECharacteristic *pChar) override
     {
-        _owner->_handleServerHostWrite(String(pChar->getValue().c_str()));
+        std::string v = pChar->getValue();
+        _printHex("[WC] ServerHost raw", (const uint8_t *)v.data(), v.length());
+        _owner->_handleServerHostWrite(_charToString(pChar));
     }
 
 private:
@@ -97,7 +123,9 @@ public:
     explicit _WCCommandCallback(WizardozConnect *owner) : _owner(owner) {}
     void onWrite(NimBLECharacteristic *pChar) override
     {
-        _owner->_handleCommandWrite(String(pChar->getValue().c_str()));
+        std::string v = pChar->getValue();
+        _printHex("[WC] Command raw", (const uint8_t *)v.data(), v.length());
+        _owner->_handleCommandWrite(_charToString(pChar));
     }
 
 private:
@@ -183,6 +211,12 @@ void WizardozConnect::_initBLE()
 {
     NimBLEDevice::init(_deviceName.c_str());
     NimBLEDevice::setPower(ESP_PWR_LVL_P9);
+
+    // Disable BLE security entirely — the ESP32-S3 can auto-negotiate
+    // encryption which garbles notification payloads when the browser
+    // doesn't complete pairing.
+    NimBLEDevice::setSecurityAuth(false, false, false);
+    NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
 
     NimBLEServer *pServer = NimBLEDevice::createServer();
     pServer->setCallbacks(new _WCServerCallbacks(this));
@@ -318,13 +352,43 @@ void WizardozConnect::_clearCredentials()
 // Private — Status helpers
 // ============================================================================
 
+// DMA-safe buffer in internal SRAM — never PSRAM.
+// NimBLE's setValue() copies into a std::string whose backing store *may*
+// land in PSRAM on ESP32-S3 (OPI).  By calling setValue with an explicit
+// (uint8_t*, len) from this DRAM_ATTR buffer we give the BLE controller
+// data it can always reach.
+static DRAM_ATTR char g_statusBuf[64];
+
+static void _sendStatus(const char *text)
+{
+    size_t len = strlen(text);
+    if (len >= sizeof(g_statusBuf))
+        len = sizeof(g_statusBuf) - 1;
+    memcpy(g_statusBuf, text, len);
+    g_statusBuf[len] = '\0';
+
+    Serial.printf("[WC] Status → \"%s\"\n", g_statusBuf);
+    _printHex("[WC] Status set", (const uint8_t *)g_statusBuf, len);
+
+    // Write using explicit pointer + length from the DRAM buffer
+    g_charStatus->setValue((uint8_t *)g_statusBuf, len);
+
+    // Verify the stored value matches what we intended
+    std::string stored = g_charStatus->getValue();
+    _printHex("[WC] Status stored", (const uint8_t *)stored.data(), stored.length());
+    if (stored.length() != len || memcmp(stored.data(), g_statusBuf, len) != 0)
+    {
+        Serial.println("[WC] WARNING: stored value does NOT match — possible PSRAM issue");
+    }
+
+    delay(20);
+    g_charStatus->notify();
+}
+
 void WizardozConnect::_updateStatus(const char *status)
 {
     if (g_charStatus)
-    {
-        g_charStatus->setValue(status);
-        g_charStatus->notify();
-    }
+        _sendStatus(status);
 }
 
 void WizardozConnect::_updateStatusWithIP(const char *status, const String &ip)
@@ -332,8 +396,7 @@ void WizardozConnect::_updateStatusWithIP(const char *status, const String &ip)
     if (g_charStatus)
     {
         String payload = String(status) + ":" + ip;
-        g_charStatus->setValue(payload.c_str());
-        g_charStatus->notify();
+        _sendStatus(payload.c_str());
     }
 }
 

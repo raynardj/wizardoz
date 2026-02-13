@@ -156,6 +156,23 @@ header nav a.active { color: var(--accent); }
     border-radius: 4px;
 }
 
+/* ----- Device log panel ----- */
+.device-log {
+    margin-top: 1rem;
+    max-height: 180px;
+    overflow-y: auto;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: .6rem .75rem;
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    line-height: 1.55;
+    color: var(--text-muted);
+}
+.device-log:empty { display: none; }
+.device-log p { margin: 0; white-space: pre-wrap; word-break: break-all; }
+
 /* ----- Misc ----- */
 .text-muted { color: var(--text-muted); }
 .text-sm    { font-size: .8rem; }
