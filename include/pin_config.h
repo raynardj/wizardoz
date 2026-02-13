@@ -17,14 +17,10 @@
 
 // --- SPI TFT Display (ST7789 240x240) ----------------------------------------
 // Protocol: SPI + control lines
+// NOTE: TFT_CS, TFT_DC, TFT_RST, TFT_MOSI, TFT_SCLK, TFT_WIDTH, TFT_HEIGHT
+//       are defined via build_flags in platformio.ini for TFT_eSPI.
+//       Only the backlight pin (not used by TFT_eSPI) is defined here.
 #define TFT_BL_PIN  7    // GPIO 7  -> BLK (backlight, active high)
-#define TFT_DC_PIN  8    // GPIO 8  -> DC  (data/command select)
-#define TFT_RST_PIN 9    // GPIO 9  -> RES (hardware reset, active low)
-#define TFT_CS_PIN  10   // GPIO 10 -> CS  (chip select, active low)
-#define TFT_MOSI_PIN 11  // GPIO 11 -> SDA (SPI MOSI)
-#define TFT_SCLK_PIN 12  // GPIO 12 -> SCL (SPI clock)
-#define TFT_WIDTH  240
-#define TFT_HEIGHT 240
 
 // --- Onboard RGB LED (WS2812) -----------------------------------------------
 #define LED_RGB_PIN 48
