@@ -25,6 +25,12 @@
 // --- Onboard RGB LED (WS2812) -----------------------------------------------
 #define LED_RGB_PIN 48
 
+// --- 4x4 Matrix Keypad ------------------------------------------------------
+// Rows: outputs (driven LOW during scan)
+// Cols: inputs (pull-up, read)
+#define KEYPAD_ROW_PINS { 13, 14, 15, 16 }  // R1, R2, R3, R4
+#define KEYPAD_COL_PINS { 17, 18, 19, 20 }  // C1, C2, C3, C4
+
 // --- WebSocket Configuration ------------------------------------------------
 #define WS_SERVER_PORT 8000
 #define WS_AUDIO_PATH "/ws/audio/"

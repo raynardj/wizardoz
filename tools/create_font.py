@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""
+Generate a TFT_eSPI VLW smooth font (as a C header) that includes
+Basic Latin **and** Chinese characters.
+
+Usage (from project root, always use poetry in server folder):
+    cd server && poetry run python ../tools/create_font.py
+
+To refresh the Chinese character list from HanziList:
+    cd server && poetry run python ../tools/fetch_hanzi.py
+
+Output:
+    src/tft/fonts/chinese_16.h   — PROGMEM array, included directly in firmware
+    data/Chinese-16.vlw           — optional SPIFFS file (same data)
+
+Requirements:
+    Pillow  (added to server/pyproject.toml dev deps)
+"""
+
+import csv
+import struct
+import sys
+import os
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+FONT_SIZE = 16  # points
+ARRAY_NAME = "chinese_16"
+HEADER_RELPATH = "src/tft/fonts/chinese_16.h"
+VLW_RELPATH = "data/Chinese-16.vlw"
+
+# macOS font search order (first found wins)
+FONT_CANDIDATES = [
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    "/System/Library/Fonts/Hiragino Sans GB.ttc",
+    "/System/Library/Fonts/Supplemental/Songti.ttc",
+    "/System/Library/Fonts/STHeiti Light.ttc",
+]
+
+# ---------------------------------------------------------------------------
+# Character sets
+# ---------------------------------------------------------------------------
+
+# Basic Latin + Latin‑1 Supplement (covers ö ü ä etc.)
+LATIN_RANGE = list(range(0x20, 0x7F)) + list(range(0xA0, 0x100))
+
+# Common Chinese punctuation
+CN_PUNCT = "，。！？、；：""''（）【】《》…—～·"
+
+# HanziList frequency CSV (rank,char) — run tools/fetch_hanzi.py to refresh
+HANZI_CSV_RELPATH = "tools/data/hanzi_frequency.csv"
+
+
+def load_chinese_chars_from_csv(csv_path, max_chars=3500):
+    """Load unique Chinese characters from HanziList frequency CSV.
+    Returns a string of characters in frequency order (most common first).
+    """
+    chars = []
+    with open(csv_path, encoding="utf-8") as f:
+        for row in csv.reader(f):
+            if len(row) >= 2 and len(row[1]) == 1:
+                chars.append(row[1])
+            if len(chars) >= max_chars:
+                break
+    return "".join(chars)
+
+
+def build_charset(project_root):
+    chars = set()
+    for cp in LATIN_RANGE:
+        chars.add(chr(cp))
+    for ch in CN_PUNCT:
+        chars.add(ch)
+    csv_path = project_root / HANZI_CSV_RELPATH
+    if csv_path.is_file():
+        common_cn = load_chinese_chars_from_csv(csv_path)
+        for ch in common_cn:
+            chars.add(ch)
+    else:
+        sys.exit(f"ERROR: Hanzi frequency CSV not found: {csv_path}. Run: cd server && poetry run python ../tools/fetch_hanzi.py")
+    return sorted(chars, key=ord)
+
+
+# ---------------------------------------------------------------------------
+# VLW builder
+# ---------------------------------------------------------------------------
+
+def find_font():
+    for p in FONT_CANDIDATES:
+        if os.path.isfile(p):
+            return p
+    sys.exit("ERROR: No Chinese font found. Install one or edit FONT_CANDIDATES.")
+
+
+def build_vlw(chars, font_path, font_size):
+    """Return bytes of the VLW file for *chars* rendered with *font_path*."""
+    font = ImageFont.truetype(font_path, font_size)
+    ascent, descent = font.getmetrics()
+
+    glyphs = []  # list of (unicode, width, height, xAdvance, dY, dX, bitmap_bytes)
+
+    for ch in chars:
+        bbox = font.getbbox(ch)  # (left, top, right, bottom)
+        if bbox is None:
+            continue
+        left, top, right, bottom = bbox
+        w = right - left
+        h = bottom - top
+        if w == 0 or h == 0:
+            # Space or zero‑width — still record with empty bitmap
+            adv = int(font.getlength(ch))
+            glyphs.append((ord(ch), 0, 0, adv if adv > 0 else font_size // 3, 0, 0, b""))
+            continue
+
+        img = Image.new("L", (w, h), 0)
+        draw = ImageDraw.Draw(img)
+        draw.text((-left, -top), ch, font=font, fill=255)
+        bmp = img.tobytes()
+
+        adv = int(font.getlength(ch))
+        dY = ascent - top   # baseline → top of bitmap
+        dX = left            # cursor → left edge
+
+        glyphs.append((ord(ch), h, w, adv, dY, dX, bmp))
+
+    gCount = len(glyphs)
+    version = 11
+    buf = bytearray()
+
+    # --- Header (6 × uint32 BE) ---
+    buf += struct.pack(">IIIIII", gCount, version, font_size, 0, ascent, descent)
+
+    # --- Glyph metric tables (7 × int32 BE each) ---
+    for uni, h, w, adv, dY, dX, _ in glyphs:
+        buf += struct.pack(">iiiiiii", uni, h, w, adv, dY, dX, 0)
+
+    # --- Bitmap data ---
+    for _, _, _, _, _, _, bmp in glyphs:
+        buf += bmp
+
+    return bytes(buf)
+
+
+def vlw_to_header(vlw_bytes, array_name):
+    """Convert raw VLW bytes to a C header string (PROGMEM array)."""
+    lines = [
+        "#pragma once",
+        "#include <pgmspace.h>",
+        "",
+        f"// Auto‑generated by tools/create_font.py — {len(vlw_bytes)} bytes",
+        f"const uint8_t {array_name}[] PROGMEM = {{",
+    ]
+    for i in range(0, len(vlw_bytes), 16):
+        chunk = vlw_bytes[i : i + 16]
+        hex_vals = ", ".join(f"0x{b:02X}" for b in chunk)
+        lines.append(f"  {hex_vals},")
+    lines.append("};")
+    lines.append("")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main():
+    project_root = Path(__file__).resolve().parent.parent
+
+    font_path = find_font()
+    print(f"Using font: {font_path}")
+
+    chars = build_charset(project_root)
+    print(f"Character count: {len(chars)}")
+
+    vlw = build_vlw(chars, font_path, FONT_SIZE)
+    print(f"VLW size: {len(vlw):,} bytes ({len(vlw)/1024:.0f} KB)")
+
+    # Write C header
+    header_path = project_root / HEADER_RELPATH
+    header_path.parent.mkdir(parents=True, exist_ok=True)
+    header_path.write_text(vlw_to_header(vlw, ARRAY_NAME))
+    print(f"Header written: {header_path}")
+
+    # Write VLW file (for optional SPIFFS upload)
+    vlw_path = project_root / VLW_RELPATH
+    vlw_path.parent.mkdir(parents=True, exist_ok=True)
+    vlw_path.write_bytes(vlw)
+    print(f"VLW written:    {vlw_path}")
+
+    print("Done! Rebuild firmware to include the font.")
+
+
+if __name__ == "__main__":
+    main()

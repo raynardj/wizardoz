@@ -1,6 +1,8 @@
 # Wave Visualizer
 
-Real-time audio wave visualizer: ESP32-S3 captures sound via an INMP441 I2S microphone, displays a colour waveform with WiFi/BT status icons on a 240x240 ST7789 TFT, and streams audio over WiFi to a browser-based oscilloscope.
+ESP32-S3 captures sound via an INMP441 I2S microphone and displays a colour waveform with WiFi/BT status icons on a 240x240 ST7789 TFT. **Audio is sent only when key A is released** — no continuous streaming to the laptop.
+
+**Keypad push-to-talk:** Press and hold key **A** on the 4x4 matrix keypad to record audio; the waveform is shown on the LCD only while A is held. Release A to POST the recording to a configurable REST endpoint. The JSON response is parsed by a configurable key and the extracted text is shown on the LCD notification area.
 
 ---
 
@@ -20,6 +22,25 @@ graph LR
         G10["GPIO 10"]
         G11["GPIO 11"]
         G12["GPIO 12"]
+        G13["GPIO 13"]
+        G14["GPIO 14"]
+        G15["GPIO 15"]
+        G16["GPIO 16"]
+        G17["GPIO 17"]
+        G18["GPIO 18"]
+        G19["GPIO 19"]
+        G20["GPIO 20"]
+    end
+
+    subgraph Keypad ["4x4 Matrix Keypad"]
+        R1["R1"]
+        R2["R2"]
+        R3["R3"]
+        R4["R4"]
+        C1["C1"]
+        C2["C2"]
+        C3["C3"]
+        C4["C4"]
     end
 
     subgraph INMP441 ["INMP441 Mic"]
@@ -41,6 +62,15 @@ graph LR
         VCC["VCC"]
         LGND["GND"]
     end
+
+    G13 -->|"Row 1"| R1
+    G14 -->|"Row 2"| R2
+    G15 -->|"Row 3"| R3
+    G16 -->|"Row 4"| R4
+    G17 -->|"Col 1"| C1
+    G18 -->|"Col 2"| C2
+    G19 -->|"Col 3"| C3
+    G20 -->|"Col 4"| C4
 
     P3V3 -->|"3.3 V"| VDD
     PGND -->|"GND"| MGND
@@ -77,6 +107,14 @@ graph LR
 | **GPIO 10** | TFT CS | SPI | Chip select (active low) |
 | **GPIO 11** | TFT SDA | SPI MOSI | Serial data input |
 | **GPIO 12** | TFT SCL | SPI SCK | Serial clock |
+| **GPIO 13** | Keypad R1 | GPIO | Row 1 (keys 1, 2, 3, A) |
+| **GPIO 14** | Keypad R2 | GPIO | Row 2 (keys 4, 5, 6, B) |
+| **GPIO 15** | Keypad R3 | GPIO | Row 3 (keys 7, 8, 9, C) |
+| **GPIO 16** | Keypad R4 | GPIO | Row 4 (keys *, 0, #, D) |
+| **GPIO 17** | Keypad C1 | GPIO | Column 1 (pull-up) |
+| **GPIO 18** | Keypad C2 | GPIO | Column 2 (pull-up) |
+| **GPIO 19** | Keypad C3 | GPIO | Column 3 (pull-up) |
+| **GPIO 20** | Keypad C4 | GPIO | Column 4 (pull-up) |
 
 > **Note:** The ST7789 module runs at 3.3 V logic — no level shifter required with the ESP32-S3.
 
@@ -97,12 +135,14 @@ sequenceDiagram
     ESP32->>ESP32: Connect to WiFi, store creds in NVS
     ESP32-->>Browser: Notify WiFi status + IP address
 
-    Note over Browser,ESP32: Phase 2 — Audio Streaming
-    ESP32->>ESP32: Read INMP441 via I2S
-    ESP32->>ESP32: Compute amplitude bars for TFT
-    ESP32->>ESP32: Display waveform on ST7789 TFT
-    ESP32->>FastAPI: WebSocket stream PCM audio
-    FastAPI->>Browser: WebSocket relay to visualizer page
+    Note over Browser,ESP32: Phase 2 — Keypad Push-to-Talk
+    User->>ESP32: Press key A
+    ESP32->>ESP32: Start recording, show waveform on TFT
+    User->>ESP32: Release key A
+    ESP32->>ESP32: Stop recording, build WAV
+    ESP32->>FastAPI: POST /api/transcribe (WAV body)
+    FastAPI-->>ESP32: JSON with text key
+    ESP32->>ESP32: Extract text, drawNotification
 ```
 
 ---
@@ -111,20 +151,34 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    MIC["INMP441 Mic"] -->|"I2S 16-bit @ 16 kHz"| ESP["ESP32-S3"]
-    ESP -->|"SPI"| TFT["ST7789 TFT"]
-    ESP -->|"WebSocket (binary PCM)"| SRV["FastAPI Server"]
-    SRV -->|"WebSocket relay"| VIZ["Browser Visualizer"]
-
-    subgraph device ["ESP32 On-Device"]
-        ESP
-        TFT
+    subgraph input [Input]
+        KP["4x4 Keypad"]
+        MIC["INMP441 Mic"]
     end
 
-    subgraph lan ["Local Network"]
-        SRV
-        VIZ
+    subgraph esp [ESP32-S3]
+        KP_SCAN["Keypad Scan"]
+        REC["Audio Recorder"]
+        HTTP["HTTP Client"]
+        JSON["JSON Parser"]
+        TFT["ST7789 TFT"]
     end
+
+    subgraph rest [REST Service]
+        API["/api/transcribe"]
+        CONFIG["/api/button-config"]
+    end
+
+    CONFIG -->|"GET on WiFi ready"| HTTP
+    KP -->|"A pressed"| KP_SCAN
+    KP_SCAN -->|"start"| REC
+    MIC -->|"I2S PCM"| REC
+    KP_SCAN -->|"A released"| REC
+    REC -->|"stop"| HTTP
+    HTTP -->|"POST WAV"| API
+    API -->|"JSON"| HTTP
+    HTTP -->|"body"| JSON
+    JSON -->|"response_key"| TFT
 ```
 
 ---
@@ -147,8 +201,12 @@ flowchart TD
 
 - **Top-left**: WiFi signal icon — cyan when connected, dark grey when disconnected.
 - **Top-right**: Bluetooth icon — cyan when a BLE client is connected, dark grey when only advertising.
-- **Centre**: Important notification text (status messages).
-- **Lower centre**: Real-time waveform bar graph (28 bars, colour-coded green/yellow/red by amplitude).
+- **Centre**: Notification text — status messages, or when using keypad A:
+  - `Recording...` while A is held
+  - `Sending...` while POSTing to REST
+  - Extracted text from API response (e.g. transcription)
+  - `Error: no WiFi`, `Error: request failed`, `Error: no audio` on failure
+- **Lower centre**: Waveform bar graph (28 bars, colour-coded green/yellow/red) — **only visible while key A is pressed** (recording). Cleared when A is released.
 
 ---
 
@@ -198,13 +256,31 @@ The server binds to `0.0.0.0:8000` so any device on your LAN can reach it.
 
 The ESP32 saves the credentials in flash (NVS). On subsequent boots it will reconnect automatically — no need to re-provision.
 
-### 4. View the Waveform
+### 4. Configure Button Mapping (Optional)
 
-1. Navigate to **http://localhost:8000/visualizer**
-2. Select your device from the dropdown and click **Connect**
-3. The oscilloscope waveform, frequency spectrum, and level meter update in real time
+1. Navigate to **http://localhost:8000/config**
+2. Set endpoint, response key, and content type for each button (A, B, C, D)
+3. Click **Save Configuration**
+4. The ESP32 fetches this config when it connects to WiFi
 
-Meanwhile, the ST7789 TFT on the ESP32 itself shows a colour bar-graph visualizer with WiFi and Bluetooth status icons.
+### 5. Keypad Push-to-Talk
+
+1. Ensure WiFi is connected and the server is running
+2. Press and hold key **A** on the 4x4 keypad — the LCD shows `Recording...`
+3. Speak into the microphone
+4. Release **A** — the LCD shows `Sending...`, then the text extracted from the API response
+
+---
+
+## Button Configuration
+
+Configure button-to-endpoint mapping via the **Button Config** tab at **http://localhost:8000/config**, or edit [include/button_config.h](include/button_config.h) for compile-time defaults.
+
+The ESP32 fetches config from `GET /api/button-config` when WiFi connects. If the fetch fails, it falls back to the compile-time values in `button_config.h`.
+
+- **endpoint**: Path (e.g. `/api/transcribe`) — uses server host from BLE config. Or use a full URL to override.
+- **response_key**: JSON key to extract from the response (e.g. `"text"`, `"transcription"`).
+- **content_type**: `audio/wav` or `audio/raw` (16 kHz, 16-bit mono).
 
 ---
 
@@ -213,25 +289,36 @@ Meanwhile, the ST7789 TFT on the ESP32 itself shows a colour bar-graph visualize
 ```
 wizardoz/
 ├── include/
-│   └── pin_config.h               # GPIO & SPI pin definitions
+│   ├── pin_config.h              # GPIO & SPI pin definitions
+│   └── button_config.h            # Button-to-REST endpoint mapping
 ├── lib/
 │   └── WizardozConnect/           # Reusable BLE WiFi provisioning library
 │       ├── WizardozConnect.h
 │       └── WizardozConnect.cpp
 ├── src/
 │   ├── main.cpp                   # Wave visualizer firmware
+│   ├── keypad/
+│   │   ├── keypad.h
+│   │   └── keypad.cpp             # 4x4 matrix scan
+│   ├── audio/
+│   │   ├── recorder.h
+│   │   └── recorder.cpp           # PSRAM buffer, WAV output
+│   ├── http/
+│   │   ├── audio_client.h
+│   │   └── audio_client.cpp       # POST audio, parse JSON
 │   └── README.md                  # ← you are here
 ├── server/                        # FastAPI backend
 │   ├── pyproject.toml
 │   ├── README.md
 │   └── wizardoz_server/
-│       ├── main.py                # App + WebSocket relay
+│       ├── main.py                # App + REST API + button config
 │       ├── static/css/style.css
 │       ├── static/js/ble-connect.js
 │       ├── static/js/visualizer.js
 │       └── templates/
 │           ├── base.html
 │           ├── dashboard.html
+│           ├── config.html            # Button-to-endpoint config form
 │           └── visualizer.html
 └── platformio.ini
 ```
@@ -244,8 +331,10 @@ wizardoz/
 |---------|-----|
 | BLE scan shows no devices | Make sure the ESP32 is powered and you see `BLE advertising` in serial monitor |
 | WiFi status stuck on CONNECTING | Double-check SSID spelling and password; try moving closer to the access point |
-| Device configured but not in visualizer list | The server must be reachable from the ESP32. Use the dashboard (not localhost) so the correct LAN IP is sent, or ensure the server runs on your router/gateway |
+| Device configured but not in visualizer list | Audio streaming is disabled. Use keypad A for push-to-talk instead |
 | TFT shows blank/white screen | Check SPI wiring: MOSI->GPIO11, SCK->GPIO12, CS->GPIO10, DC->GPIO8, RST->GPIO9. Verify VCC is 3.3 V and GND is connected |
 | TFT backlight does not turn on | Ensure BLK pin is wired to GPIO 7. The backlight is driven HIGH by firmware |
-| Visualizer shows flat line | Confirm the device appears in `/api/devices`; check that the ESP32 serial log shows `[WS] Connection opened` |
+| Visualizer shows flat line | Audio streaming is disabled. Waveform appears on LCD only when key A is pressed |
 | "Web Bluetooth not supported" | Switch to Chrome or Edge — Firefox and Safari do not support the Web Bluetooth API |
+| Keypad A shows "Error: request failed" | Ensure server is running and reachable; check endpoint in Button Config page or button_config.h |
+| Keypad A shows "Error: no WiFi" | Connect WiFi via BLE provisioning before using push-to-talk |

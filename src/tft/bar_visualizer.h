@@ -10,3 +10,6 @@ void computeBars(const int16_t *samples, int numSamples);
 
 /// Render the bar graph to the TFT.
 void renderBars();
+
+/// Clear the waveform area and reset bar heights.
+void clearBars();

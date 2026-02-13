@@ -91,3 +91,13 @@ void renderBars()
         }
     }
 }
+
+void clearBars()
+{
+    for (int col = 0; col < DISPLAY_BAR_COLS; col++)
+    {
+        barHeights[col] = 0;
+    }
+    int waveWidth = DISPLAY_BAR_COLS * BAR_STEP - BAR_GAP;
+    tft.fillRect(WAVE_LEFT, WAVE_TOP, waveWidth, WAVE_HEIGHT, COL_BG);
+}

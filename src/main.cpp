@@ -3,29 +3,31 @@
 // =============================================================================
 //
 // Reads audio from an INMP441 I2S MEMS microphone, displays a real-time
-// waveform on a 240x240 ST7789 SPI TFT with WiFi/BT status icons, and
-// streams audio over WiFi (WebSocket) to a FastAPI backend for browser-based
-// visualisation.
+// waveform on a 240x240 ST7789 SPI TFT (only when key A is pressed), and
+// POSTs recorded audio to a REST endpoint when A is released.
 //
 // Hardware:
 //   - YD-ESP32-23 (ESP32-S3-N16R8)
 //   - INMP441 microphone       (I2S — GPIO 4/5/6)
 //   - ST7789 240x240 IPS TFT   (SPI — GPIO 7/8/9/10/11/12)
+//   - 4x4 matrix keypad       (GPIO 13–20)
 //
 // =============================================================================
 
 #include <Arduino.h>
+#include <WiFi.h>
 #include <driver/i2s.h>
 #include <SPI.h>
-#include <ArduinoWebsockets.h>
 #include <WizardozConnect.h>
 
 #include "pin_config.h"
+#include "button_config.h"
 #include "tft/display.h"
 #include "tft/status_icons.h"
 #include "tft/bar_visualizer.h"
-
-using namespace websockets;
+#include "keypad/keypad.h"
+#include "audio/recorder.h"
+#include "http/audio_client.h"
 
 // =============================================================================
 // Audio / I2S Constants
@@ -37,18 +39,15 @@ static const int AUDIO_BUF_LEN = 512; // samples per read cycle
 
 // Timing
 static const uint32_t TFT_UPDATE_MS = 50; // ~20 fps display refresh
-static const uint32_t WS_SEND_MS = 50;    // 20 fps WebSocket send
 
 // =============================================================================
 // Globals
 // =============================================================================
 
 WizardozConnect connector("Wizardoz-Wave");
-WebsocketsClient wsClient;
 
 int16_t audioBuf[AUDIO_BUF_LEN];
 
-bool wsConnected = false;
 String serverHost = "";
 uint16_t serverPort = WS_SERVER_PORT;
 
@@ -59,7 +58,13 @@ bool prevBLEState = false;
 bool currBLEState = false;
 
 unsigned long lastTFTUpdate = 0;
-unsigned long lastWSSend = 0;
+
+// Keypad "A" — push-to-talk recording
+static bool aWasPressed = false;
+
+// Runtime config from GET /api/button-config (fallback to button_config.h if fetch fails)
+static String configResponseKeyA;
+static String configContentTypeA;
 
 // =============================================================================
 // I2S Setup
@@ -105,45 +110,6 @@ void initI2S()
 }
 
 // =============================================================================
-// WebSocket
-// =============================================================================
-
-void onWSMessage(WebsocketsMessage message)
-{
-    Serial.printf("[WS] Received: %s\n", message.data().c_str());
-}
-
-void onWSEvent(WebsocketsEvent event, String data)
-{
-    if (event == WebsocketsEvent::ConnectionOpened)
-    {
-        Serial.println("[WS] Connection opened");
-        wsConnected = true;
-    }
-    else if (event == WebsocketsEvent::ConnectionClosed)
-    {
-        Serial.println("[WS] Connection closed");
-        wsConnected = false;
-    }
-    else if (event == WebsocketsEvent::GotPing)
-    {
-        wsClient.pong();
-    }
-}
-
-void connectWebSocket()
-{
-    if (serverHost.length() == 0)
-        return;
-
-    String url = "ws://" + serverHost + ":" + String(serverPort) + WS_AUDIO_PATH + connector.getDeviceName();
-    Serial.printf("[WS] Connecting to %s\n", url.c_str());
-    wsClient.onMessage(onWSMessage);
-    wsClient.onEvent(onWSEvent);
-    wsClient.connect(url);
-}
-
-// =============================================================================
 // WiFi ready / lost callbacks
 // =============================================================================
 
@@ -171,14 +137,24 @@ void onWiFiReady(const String &ip)
         Serial.printf("[Main] Server host (gateway): %s\n", serverHost.c_str());
     }
 
+    audioClientSetBaseUrl(serverHost, serverPort);
+
+    if (audioClientFetchConfig(configResponseKeyA, configContentTypeA))
+    {
+        Serial.println("[Main] Button config loaded from server");
+    }
+    else
+    {
+        configResponseKeyA = "";
+        configContentTypeA = "";
+        Serial.println("[Main] Using compile-time button config");
+    }
     delay(500);
-    connectWebSocket();
 }
 
 void onWiFiLost()
 {
     Serial.println("[Main] WiFi lost");
-    wsConnected = false;
 
     currWiFiState = false;
     drawWiFiIcon(false);
@@ -209,6 +185,7 @@ void setup()
 
     initDisplay();
     initI2S();
+    keypadInit();
 
     connector.onWiFiReady(onWiFiReady);
     connector.onWiFiLost(onWiFiLost);
@@ -227,6 +204,55 @@ void loop()
 {
     connector.loop();
 
+    // --- Keypad scan and "A" push-to-talk ----------------------------------
+    keypadScan();
+    bool aPressed = keypadIsKeyPressed('A');
+
+    if (aPressed && !aWasPressed)
+    {
+        recorderStart();
+        drawNotification("Recording...");
+    }
+    else if (!aPressed && aWasPressed)
+    {
+        clearBars();
+        recorderStop();
+        size_t wavSize = recorderGetWavSize();
+        const uint8_t *wavBuf = recorderGetWavBuffer();
+
+        if (wavSize > 0 && connector.isWiFiConnected())
+        {
+            drawNotification("Sending...");
+            String outText;
+            const char *key = configResponseKeyA.length() ? configResponseKeyA.c_str() : BUTTON_A_RESPONSE_KEY;
+            const char *ct = configContentTypeA.length() ? configContentTypeA.c_str() : BUTTON_A_CONTENT_TYPE;
+            bool ok = audioClientPost("A", key, ct, wavBuf, wavSize, outText);
+            if (ok && outText.length() > 0)
+            {
+                drawNotification(outText.c_str());
+            }
+            else if (!ok)
+            {
+                drawNotification("Error: request failed");
+            }
+        }
+        else if (!connector.isWiFiConnected())
+        {
+            drawNotification("Error: no WiFi");
+        }
+        else if (wavSize == 0)
+        {
+            drawNotification("Error: no audio");
+        }
+    }
+    aWasPressed = aPressed;
+
+    // --- Feed recorder while holding A -------------------------------------
+    if (recorderIsRecording())
+    {
+        // Samples fed below after i2s_read
+    }
+
     // --- Read audio from INMP441 -------------------------------------------
     size_t bytesRead = 0;
     esp_err_t err = i2s_read(
@@ -242,8 +268,14 @@ void loop()
         samplesRead = bytesRead / sizeof(int16_t);
     }
 
-    // --- Update TFT waveform -----------------------------------------------
-    if (samplesRead > 0)
+    // --- Feed recorder if recording -----------------------------------------
+    if (recorderIsRecording() && samplesRead > 0)
+    {
+        recorderFeedSamples(audioBuf, samplesRead);
+    }
+
+    // --- Update TFT waveform (only when recording) -------------------------
+    if (recorderIsRecording() && samplesRead > 0)
     {
         computeBars(audioBuf, samplesRead);
 
@@ -252,36 +284,6 @@ void loop()
         {
             lastTFTUpdate = now;
             renderBars();
-        }
-    }
-
-    // --- Stream audio over WebSocket ---------------------------------------
-    if (wsConnected && samplesRead > 0)
-    {
-        unsigned long now = millis();
-        if (now - lastWSSend >= WS_SEND_MS)
-        {
-            lastWSSend = now;
-            // Send raw PCM as binary frame
-            wsClient.sendBinary((const char *)audioBuf, bytesRead);
-        }
-    }
-
-    // --- Maintain WebSocket connection -------------------------------------
-    if (wsConnected)
-    {
-        wsClient.poll();
-    }
-
-    // --- Reconnect WebSocket if WiFi up but WS dropped ---------------------
-    if (connector.isWiFiConnected() && !wsConnected)
-    {
-        static unsigned long lastReconnect = 0;
-        unsigned long now = millis();
-        if (now - lastReconnect > 5000)
-        {
-            lastReconnect = now;
-            connectWebSocket();
         }
     }
 }

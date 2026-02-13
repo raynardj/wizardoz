@@ -1,19 +1,23 @@
 """
 Wizardoz Server — FastAPI application.
 
-Serves the BLE WiFi provisioning dashboard and real-time audio wave visualiser.
-Relays audio data from ESP32 WebSocket clients to browser WebSocket viewers.
+Serves the BLE WiFi provisioning dashboard and REST API for ESP32
+push-to-talk audio transcription. Button and routing config is defined
+in BUTTON_CONFIG below.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections import defaultdict
 from pathlib import Path
 
+import httpx
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import Response
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -25,6 +29,29 @@ from starlette.requests import Request
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 TEMPLATE_DIR = BASE_DIR / "templates"
+
+
+def music_identify_response_process(data) -> str:
+    """
+    return the title and the artist of the 1st match
+    separated by newline so the LCD can display them on two lines.
+
+    example response:
+    """
+    if "matches" in data:
+        title = data['matches'][0]['metadata']['Title']
+        artist = data['matches'][0]['metadata']['Artist']
+        return f"{title}\n{artist}"
+    return "No matches found"
+
+BUTTON_CONFIG = {
+    "buttons": {
+        "A": {"endpoint": "http://localhost:8080/identify", "response_key": music_identify_response_process, "content_type": "audio/wav"},
+        "B": {"endpoint": "", "response_key": "text", "content_type": "audio/wav"},
+        "C": {"endpoint": "", "response_key": "text", "content_type": "audio/wav"},
+        "D": {"endpoint": "", "response_key": "text", "content_type": "audio/wav"},
+    },
+}
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -68,7 +95,7 @@ async def dashboard(request: Request):
 
 @app.get("/visualizer")
 async def visualizer(request: Request):
-    """Real-time audio waveform visualiser."""
+    """Real-time audio waveform visualiser (disabled — use keypad A for push-to-talk)."""
     return templates.TemplateResponse("visualizer.html", {"request": request})
 
 
@@ -80,6 +107,89 @@ async def visualizer(request: Request):
 async def list_devices():
     """Return list of known device IDs (devices that have connected via WS)."""
     return {"devices": sorted(known_devices)}
+
+
+def _serialize_button_config() -> dict:
+    """Return config for ESP32. Callables become response_key='text'."""
+    buttons = {}
+    for k, v in BUTTON_CONFIG["buttons"].items():
+        rk = v.get("response_key", "text")
+        serialized_key = "text" if callable(rk) else rk
+        buttons[k] = {
+            "endpoint": v.get("endpoint", ""),
+            "response_key": serialized_key,
+            "content_type": v.get("content_type", "audio/wav"),
+        }
+    return {"buttons": buttons}
+
+
+@app.get("/api/button-config")
+async def get_button_config():
+    """Return current button-to-endpoint config for ESP32."""
+    return _serialize_button_config()
+
+
+@app.post("/talkie")
+async def talkie(request: Request):
+    """
+    Proxy audio to a backend service configured per button.
+
+    The device sends raw audio with an ``X-Button`` header (default ``A``).
+    The server looks up that button's ``endpoint`` URL from BUTTON_CONFIG
+    and forwards the audio as multipart/form-data.  When response_key is
+    a callable, the backend JSON is transformed before returning.
+    """
+    button = request.headers.get("x-button", "A").upper()
+    btn_cfg = BUTTON_CONFIG.get("buttons", {}).get(button)
+    if not btn_cfg or not btn_cfg.get("endpoint", "").strip():
+        raise HTTPException(status_code=404, detail=f"No endpoint configured for button {button}")
+
+    backend_url = btn_cfg["endpoint"].strip()
+    response_key = btn_cfg.get("response_key", "text")
+    body = await request.body()
+    if not body:
+        raise HTTPException(status_code=400, detail="No audio data")
+
+    content_type = request.headers.get("content-type", "audio/wav")
+    files = {"audio": ("audio.wav", body, content_type)}
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(backend_url, files=files)
+    except httpx.RequestError as e:
+        logger.warning("Proxy request to %s failed: %s", backend_url, e)
+        raise HTTPException(status_code=502, detail="Backend unavailable")
+
+    # Apply response_key callback if callable and backend returned JSON.
+    # Always return 200 so the ESP32 parses the body and displays the text.
+    if callable(response_key):
+        ct = r.headers.get("content-type", "")
+        if "application/json" in ct:
+            try:
+                data = r.json()
+                result = response_key(data)
+                return Response(
+                    content=json.dumps({"text": str(result)}),
+                    status_code=200,
+                    headers={"Content-Type": "application/json"},
+                )
+            except Exception as e:
+                logger.warning("Callback response_key failed: %s", e)
+                return Response(
+                    content=json.dumps({"text": "Error: invalid response"}),
+                    status_code=200,
+                    headers={"Content-Type": "application/json"},
+                )
+        return Response(
+            content=json.dumps({"text": "Error: invalid response"}),
+            status_code=200,
+            headers={"Content-Type": "application/json"},
+        )
+
+    return Response(
+        content=r.content,
+        status_code=r.status_code,
+        headers=dict(r.headers),
+    )
 
 
 @app.get("/api/server-ip")
