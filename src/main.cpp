@@ -17,81 +17,49 @@
 #include <Arduino.h>
 #include <driver/i2s.h>
 #include <SPI.h>
-#include <TFT_eSPI.h>
 #include <ArduinoWebsockets.h>
 #include <WizardozConnect.h>
 
 #include "pin_config.h"
+#include "tft/display.h"
+#include "tft/status_icons.h"
+#include "tft/bar_visualizer.h"
 
 using namespace websockets;
 
 // =============================================================================
-// Layout Constants
+// Audio / I2S Constants
 // =============================================================================
 
-// Status bar
-static const int STATUS_BAR_H     = 24;
-static const int ICON_SIZE         = 16;
-static const int ICON_MARGIN       = 6;
-
-// Notification zone (centred text area between status bar and waveform)
-static const int NOTIFY_Y          = 40;
-static const int NOTIFY_H          = 50;
-
-// Waveform zone
-static const int WAVE_TOP          = 100;
-static const int WAVE_BOTTOM       = 235;
-static const int WAVE_HEIGHT       = WAVE_BOTTOM - WAVE_TOP;    // 135 px
-static const int BAR_WIDTH         = 6;
-static const int BAR_GAP           = 2;
-static const int BAR_STEP          = BAR_WIDTH + BAR_GAP;       // 8 px per bar
-static const int DISPLAY_BAR_COLS  = 28;                        // 28 * 8 = 224 px
-static const int WAVE_LEFT         = (TFT_WIDTH - DISPLAY_BAR_COLS * BAR_STEP + BAR_GAP) / 2;
-
-// Audio / I2S
-static const int DMA_BUF_COUNT    = 4;
-static const int DMA_BUF_LEN      = 256;       // samples per DMA buffer
-static const int AUDIO_BUF_LEN    = 512;       // samples per read cycle
+static const int DMA_BUF_COUNT = 4;
+static const int DMA_BUF_LEN = 256;   // samples per DMA buffer
+static const int AUDIO_BUF_LEN = 512; // samples per read cycle
 
 // Timing
-static const uint32_t TFT_UPDATE_MS = 50;      // ~20 fps display refresh
-static const uint32_t WS_SEND_MS    = 50;      // 20 fps WebSocket send
-
-// =============================================================================
-// Colours
-// =============================================================================
-
-static const uint16_t COL_BG         = TFT_BLACK;
-static const uint16_t COL_BAR_LOW    = TFT_GREEN;
-static const uint16_t COL_BAR_MID    = TFT_YELLOW;
-static const uint16_t COL_BAR_HIGH   = TFT_RED;
-static const uint16_t COL_ICON_ON    = TFT_CYAN;
-static const uint16_t COL_ICON_OFF   = 0x4208;   // dark grey
-static const uint16_t COL_NOTIFY     = TFT_WHITE;
+static const uint32_t TFT_UPDATE_MS = 50; // ~20 fps display refresh
+static const uint32_t WS_SEND_MS = 50;    // 20 fps WebSocket send
 
 // =============================================================================
 // Globals
 // =============================================================================
 
-TFT_eSPI tft = TFT_eSPI();
 WizardozConnect connector("Wizardoz-Wave");
 WebsocketsClient wsClient;
 
 int16_t audioBuf[AUDIO_BUF_LEN];
-int barHeights[DISPLAY_BAR_COLS] = {0};
 
-bool wsConnected  = false;
+bool wsConnected = false;
 String serverHost = "";
 uint16_t serverPort = WS_SERVER_PORT;
 
 // State tracking for icons to avoid unnecessary redraws
 bool prevWiFiState = false;
 bool currWiFiState = false;
-bool prevBLEState  = false;
-bool currBLEState  = false;
+bool prevBLEState = false;
+bool currBLEState = false;
 
 unsigned long lastTFTUpdate = 0;
-unsigned long lastWSSend    = 0;
+unsigned long lastWSSend = 0;
 
 // =============================================================================
 // I2S Setup
@@ -100,24 +68,24 @@ unsigned long lastWSSend    = 0;
 void initI2S()
 {
     i2s_config_t i2sConfig = {
-        .mode              = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
-        .sample_rate       = I2S_MIC_SAMPLE_RATE,
-        .bits_per_sample   = I2S_BITS_PER_SAMPLE_16BIT,
-        .channel_format    = I2S_MIC_CHANNEL,
+        .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
+        .sample_rate = I2S_MIC_SAMPLE_RATE,
+        .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
+        .channel_format = I2S_MIC_CHANNEL,
         .communication_format = I2S_COMM_FORMAT_STAND_I2S,
-        .intr_alloc_flags  = ESP_INTR_FLAG_LEVEL1,
-        .dma_buf_count     = DMA_BUF_COUNT,
-        .dma_buf_len       = DMA_BUF_LEN,
-        .use_apll          = false,
+        .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
+        .dma_buf_count = DMA_BUF_COUNT,
+        .dma_buf_len = DMA_BUF_LEN,
+        .use_apll = false,
         .tx_desc_auto_clear = false,
-        .fixed_mclk        = 0,
+        .fixed_mclk = 0,
     };
 
     i2s_pin_config_t pinConfig = {
-        .bck_io_num   = I2S_MIC_BCLK,
-        .ws_io_num    = I2S_MIC_LRCK,
+        .bck_io_num = I2S_MIC_BCLK,
+        .ws_io_num = I2S_MIC_LRCK,
         .data_out_num = I2S_PIN_NO_CHANGE,
-        .data_in_num  = I2S_MIC_DATA,
+        .data_in_num = I2S_MIC_DATA,
     };
 
     esp_err_t err;
@@ -134,210 +102,6 @@ void initI2S()
     i2s_zero_dma_buffer(I2S_MIC_PORT);
     Serial.println("[I2S] Microphone initialised");
     Serial0.println("[I2S] Microphone initialised");
-}
-
-// =============================================================================
-// TFT Display — Initialisation
-// =============================================================================
-
-void drawWiFiIcon(bool connected);
-void drawBTIcon(bool clientConnected);
-void drawNotification(const char *text);
-
-void initDisplay()
-{
-    tft.init();
-    tft.setRotation(0);          // 0 = portrait, connector at bottom
-    tft.fillScreen(COL_BG);
-
-    // Backlight ON
-    pinMode(TFT_BL_PIN, OUTPUT);
-    digitalWrite(TFT_BL_PIN, HIGH);
-
-    // Draw initial UI
-    drawWiFiIcon(false);
-    drawBTIcon(false);
-    drawNotification("Waiting for BLE");
-
-    Serial.println("[TFT] Display initialised (ST7789 240x240)");
-    Serial0.println("[TFT] Display initialised (ST7789 240x240)");
-}
-
-// =============================================================================
-// TFT Display — WiFi Icon (top-left corner)
-// =============================================================================
-//
-// Draws three concentric arcs to represent a WiFi signal fan.
-// Filled arcs when connected, hollow outline when disconnected.
-
-void drawWiFiIcon(bool connected)
-{
-    int cx = ICON_MARGIN + ICON_SIZE / 2;       // centre X
-    int cy = ICON_MARGIN + ICON_SIZE;            // base Y of fan
-    uint16_t col = connected ? COL_ICON_ON : COL_ICON_OFF;
-
-    // Clear icon area
-    tft.fillRect(ICON_MARGIN, ICON_MARGIN, ICON_SIZE + 4, ICON_SIZE + 4, COL_BG);
-
-    // Centre dot
-    tft.fillCircle(cx, cy, 2, col);
-
-    // Arc radii (inner to outer)
-    int radii[] = {6, 10, 14};
-    for (int i = 0; i < 3; i++)
-    {
-        int r = radii[i];
-        // Draw an arc from roughly -45 to +45 degrees above centre
-        // by plotting a circle and masking to the upper-left quadrant fan
-        for (int a = -45; a <= 45; a++)
-        {
-            float rad = a * PI / 180.0f;
-            int px = cx + (int)(r * sin(rad));
-            int py = cy - (int)(r * cos(rad));
-            if (connected)
-            {
-                tft.drawPixel(px, py, col);
-                tft.drawPixel(px, py - 1, col);   // thicken
-            }
-            else
-            {
-                tft.drawPixel(px, py, col);
-            }
-        }
-    }
-}
-
-// =============================================================================
-// TFT Display — Bluetooth Icon (top-right corner)
-// =============================================================================
-//
-// Draws a simplified Bluetooth rune (the ᛒ shape).
-
-void drawBTIcon(bool clientConnected)
-{
-    int x0 = TFT_WIDTH - ICON_MARGIN - ICON_SIZE; // left edge of icon area
-    int y0 = ICON_MARGIN;
-    uint16_t col = clientConnected ? COL_ICON_ON : COL_ICON_OFF;
-
-    // Clear icon area
-    tft.fillRect(x0 - 2, y0, ICON_SIZE + 4, ICON_SIZE + 4, COL_BG);
-
-    int cx = x0 + ICON_SIZE / 2;
-    int top = y0 + 1;
-    int bot = y0 + ICON_SIZE - 1;
-    int mid = (top + bot) / 2;
-    int right = cx + 5;
-    int left  = cx - 5;
-
-    // Vertical line
-    tft.drawLine(cx, top, cx, bot, col);
-
-    // Top-right arrow: from centre-top to right-mid
-    tft.drawLine(cx, top, right, mid, col);
-    // Bottom-right arrow: from right-mid to centre-bottom
-    tft.drawLine(right, mid, cx, bot, col);
-
-    // Cross lines
-    tft.drawLine(left, top + 3, right, bot - 3, col);
-    tft.drawLine(left, bot - 3, right, top + 3, col);
-}
-
-// =============================================================================
-// TFT Display — Notification Text (centred)
-// =============================================================================
-
-void drawNotification(const char *text)
-{
-    // Clear notification zone
-    tft.fillRect(0, NOTIFY_Y, TFT_WIDTH, NOTIFY_H, COL_BG);
-
-    tft.setTextColor(COL_NOTIFY, COL_BG);
-    tft.setTextDatum(MC_DATUM);  // middle-centre
-    tft.setTextSize(2);
-    tft.drawString(text, TFT_WIDTH / 2, NOTIFY_Y + NOTIFY_H / 2);
-}
-
-// =============================================================================
-// TFT Display — Waveform Bar Graph
-// =============================================================================
-
-static uint16_t barColor(int height, int maxH)
-{
-    // Green for low, yellow for mid, red for high
-    int pct = (height * 100) / maxH;
-    if (pct > 80) return COL_BAR_HIGH;
-    if (pct > 50) return COL_BAR_MID;
-    return COL_BAR_LOW;
-}
-
-void renderBars()
-{
-    for (int col = 0; col < DISPLAY_BAR_COLS; col++)
-    {
-        int h = barHeights[col]; // 0 .. WAVE_HEIGHT
-        if (h < 0) h = 0;
-        if (h > WAVE_HEIGHT) h = WAVE_HEIGHT;
-
-        int x = WAVE_LEFT + col * BAR_STEP;
-
-        // Clear the bar column first (draw background)
-        if (h < WAVE_HEIGHT)
-        {
-            tft.fillRect(x, WAVE_TOP, BAR_WIDTH, WAVE_HEIGHT - h, COL_BG);
-        }
-
-        // Draw the filled bar (growing upward from bottom)
-        if (h > 0)
-        {
-            uint16_t col16 = barColor(h, WAVE_HEIGHT);
-            tft.fillRect(x, WAVE_BOTTOM - h, BAR_WIDTH, h, col16);
-        }
-    }
-}
-
-// =============================================================================
-// Audio Processing — compute amplitude bars from the audio buffer
-// =============================================================================
-
-void computeBars(const int16_t *samples, int numSamples)
-{
-    int samplesPerBar = numSamples / DISPLAY_BAR_COLS;
-    if (samplesPerBar < 1)
-        samplesPerBar = 1;
-
-    for (int col = 0; col < DISPLAY_BAR_COLS; col++)
-    {
-        int start = col * samplesPerBar;
-        int end   = start + samplesPerBar;
-        if (end > numSamples)
-            end = numSamples;
-
-        // RMS amplitude for this column
-        uint64_t sumSq = 0;
-        for (int i = start; i < end; i++)
-        {
-            int32_t s = samples[i];
-            sumSq += (uint64_t)(s * s);
-        }
-        double rms = sqrt((double)sumSq / (end - start));
-
-        // Map RMS to 0 .. WAVE_HEIGHT  (tune the divisor to taste)
-        int height = (int)(rms / 1024.0 * WAVE_HEIGHT);
-        if (height > WAVE_HEIGHT)
-            height = WAVE_HEIGHT;
-
-        // Smooth: slow decay, fast rise
-        if (height >= barHeights[col])
-        {
-            barHeights[col] = height;
-        }
-        else
-        {
-            barHeights[col] = barHeights[col] - 2;
-            if (barHeights[col] < 0)
-                barHeights[col] = 0;
-        }
-    }
 }
 
 // =============================================================================
