@@ -10,7 +10,7 @@
 static const int DMA_BUF_COUNT = 4;
 static const int DMA_BUF_LEN = 256;
 static const int AUDIO_BUF_LEN = 512;
-static const uint32_t FRAME_MS = 33;
+static const uint32_t FRAME_MS = 100;
 
 WizardozConnect connector("Wizardoz-Jump");
 int16_t audioBuf[AUDIO_BUF_LEN];

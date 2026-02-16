@@ -54,6 +54,29 @@ void gameUpdate(GameState *game)
 
     if (game->princess.y >= GROUND_Y - PRINCESS_SIZE)
     {
+        bool overPit = false;
+        for (int i = 0; i < MAX_OBSTACLES; i++)
+        {
+            if (game->obstacles[i].active && game->obstacles[i].type == OBSTACLE_PIT)
+            {
+                int px = game->princess.x - 6;
+                int pw = 12;
+                if (px + pw > game->obstacles[i].x &&
+                    px < game->obstacles[i].x + game->obstacles[i].w)
+                {
+                    overPit = true;
+                    break;
+                }
+            }
+        }
+
+        if (overPit)
+        {
+            game->gameOver = true;
+            game->deathTime = millis();
+            return;
+        }
+
         game->princess.y = GROUND_Y - PRINCESS_SIZE;
         game->princess.vy = 0;
         game->princess.jumping = false;
@@ -133,16 +156,16 @@ void spawnObstacle(GameState *game)
             {
                 game->obstacles[i].type = OBSTACLE_BLOCK;
                 game->obstacles[i].x = 260;
-                game->obstacles[i].y = GROUND_Y - random(30, 70);
-                game->obstacles[i].w = random(20, 40);
-                game->obstacles[i].h = GROUND_Y - game->obstacles[i].y;
+                game->obstacles[i].h = random(15, 30);
+                game->obstacles[i].y = GROUND_Y - game->obstacles[i].h;
+                game->obstacles[i].w = random(15, 25);
             }
             else
             {
                 game->obstacles[i].type = OBSTACLE_PIT;
                 game->obstacles[i].x = 260;
                 game->obstacles[i].y = GROUND_Y;
-                game->obstacles[i].w = random(40, 80);
+                game->obstacles[i].w = random(25, 45);
                 game->obstacles[i].h = 30;
             }
 

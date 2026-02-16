@@ -2,6 +2,8 @@
 
 TFT_eSPI tft = TFT_eSPI();
 
+#define TFT_BL_PIN 7
+
 static int lastDistance = -1;
 
 void initDisplay()
@@ -50,7 +52,7 @@ void drawWiFiIcon(bool connected)
 
 void drawBTIcon(bool connected)
 {
-    int x0 = TFT_WIDTH - ICON_MARGIN - ICON_SIZE;
+    int x0 = SCREEN_WIDTH - ICON_MARGIN - ICON_SIZE;
     int y0 = ICON_MARGIN;
     uint16_t col = connected ? COL_ICON_ON : COL_ICON_OFF;
 
@@ -89,7 +91,7 @@ void drawDistance(int distance)
 
 void clearGameArea()
 {
-    tft.fillRect(0, GAME_AREA_TOP, TFT_WIDTH, GAME_AREA_HEIGHT, COL_BG);
+    tft.fillRect(0, GAME_AREA_TOP, SCREEN_WIDTH, GAME_AREA_HEIGHT, COL_BG);
 }
 
 void drawPrincess(int x, int y, bool sad)
@@ -146,7 +148,7 @@ void drawGround(int scrollOffset)
     int patternW = 20;
     int offset = scrollOffset % patternW;
 
-    for (int x = -offset; x < TFT_WIDTH; x += patternW)
+    for (int x = -offset; x < SCREEN_WIDTH; x += patternW)
     {
         tft.fillRect(x, groundY, patternW - 2, 10, COL_GROUND);
         tft.drawLine(x + patternW - 2, groundY, x + patternW - 2, groundY + 9, 0x4A69);
